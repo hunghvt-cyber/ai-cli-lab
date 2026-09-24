@@ -52,7 +52,7 @@ typedef struct {
 } ClayTodoItem;
 
 /* Where a todowrite call writes. The session has one plan, which is drawn
-   for the user; every subagent gets its own, which only it ever sees. */
+   for the user; it is isolated from the main conversation. */
 typedef struct {
   ClayArray todos; /* ClayTodoItem */
   int rendered;    /* draw it in the transcript and the status row */
@@ -131,10 +131,10 @@ struct ClayCommands {
   ClayArray tasks; /* ClayBackgroundTask*, background commands this session */
   int next_task_id;
   /* The spinner row of the tool call running right now, for a long call that
-     wants to report progress on it (see subagent.c). NULL between calls. */
+     wants to report progress on it. NULL between calls. */
   ClayTask *active_tool_task;
   /* Held by every tool that changes something (files, checkpoints, undo,
-     background tasks, approvals) so parallel subagents cannot interleave in
+     background tasks, approvals) so concurrent operations cannot interleave in
      the middle of one. Recursive: a gated tool takes it around a permission
      check that takes it too. */
   pthread_mutex_t tool_lock;
@@ -148,7 +148,7 @@ int clay_commands_fetch_models(void *ctx, ClayArray *out);
 int clay_commands_select_model(ClayCommands *commands, const char *provider,
                                const char *model);
 void clay_commands_update_selected_below(ClayCommands *commands);
-/* Folds a nested run's usage (a subagent, say) into the session totals so
+/* Folds a nested run's usage into the session totals so
    the status line and the chat journal stay honest. */
 void clay_commands_add_usage(ClayCommands *commands, long input_tokens,
                              long output_tokens);
@@ -300,11 +300,9 @@ typedef struct {
   ClayArray schemas; /* ClayJson*, owned here */
 } ClayToolSet;
 
-/* `allow_subagent` adds the two tools that only make sense for the agent
-   talking to the user: ask_user and subagent. A subagent gets everything
-   else, so it cannot nest or block on a question. */
+/* Builds the tools available to the interactive agent. */
 void clay_commands_tools_build(ClayCommands *commands, ClayPlan *plan,
-                               ClayToolSet *set, int allow_subagent);
+                               ClayToolSet *set);
 void clay_commands_tools_free(ClayToolSet *set);
 
 /* Rounds of tool calls one agent gets before the provider loop stops and
@@ -312,8 +310,6 @@ void clay_commands_tools_free(ClayToolSet *set);
    verification pass is dozens of calls, and the old ceiling of 8 cut turns
    off mid-job. Escape still cancels, and each command has its own timeout. */
 #define CLAY_AGENT_MAX_ROUNDS 64
-#define CLAY_SUBAGENT_MAX_ROUNDS 32
-
 /* Runs `messages` against the selected provider until the model answers or
    `max_rounds` is spent, appending the reply and tool results in place.
    `cache_key` groups the request for the provider's prefix cache. Returns 0
@@ -322,12 +318,6 @@ int clay_commands_run_completion(ClayCommands *commands, ClayJson *messages,
                                  const ClayToolSet *tools, int max_rounds,
                                  const char *cache_key,
                                  const ClayOpenAICallbacks *callbacks);
-
-/* Delegation tool (src/commands/subagent.c). Runs one step of a plan in a
-   fresh agent with no conversation history and returns its summary.
-   userdata is a ClayCommands*. */
-ClayJson *subagent_tool(const ClayJson *arguments, void *userdata);
-ClayJson *subagent_schema(void);
 
 /* Plan/checklist tool (src/commands/message.c). Replaces the plan it was
    built with, wholesale, on each call. userdata is a ClayPlan*. */
