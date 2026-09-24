@@ -209,14 +209,11 @@ int clay_permissions_is_mutating_command(const char *command);
 const char *clay_permissions_category_name(ClayPermissionCategory category);
 const char *clay_permissions_category_label(ClayPermissionCategory category);
 
-void clay_cmd_exit(const char *args, void *user_data);
-void clay_cmd_help(const char *args, void *user_data);
 void clay_cmd_confirm(const char *args, void *user_data);
 void clay_cmd_select(const char *args, void *user_data);
 void clay_cmd_choice(const char *args, void *user_data);
 void clay_cmd_below(const char *args, void *user_data);
 void clay_cmd_connect(const char *args, void *user_data);
-void clay_cmd_logout(const char *args, void *user_data);
 void clay_cmd_model(const char *args, void *user_data);
 void clay_cmd_effort(const char *args, void *user_data);
 void clay_cmd_resume(const char *args, void *user_data);
