@@ -1365,7 +1365,6 @@ void clay_commands_destroy(ClayCommands *commands) {
       free(*(char **)clay_array_get(remembered, j));
     clay_array_free(remembered);
   }
-  clay_array_free(&commands->plan.todos);
   clay_commands_undo_destroy(commands);
   free(commands->auto_test_command);
   free(commands);
