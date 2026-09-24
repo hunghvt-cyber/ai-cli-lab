@@ -112,6 +112,20 @@ rather than:
 
 **design a large custom system → implement → discover whether it was necessary**
 
+## Clay Worker Checkpoint
+
+The current Clay reduction has reached a stable **headless worker + AI Guard end-to-end checkpoint**.
+
+- Headless target: `workers/clay/bin/clay-worker`
+- Provider/model proven: Groq / `openai/gpt-oss-120b`
+- Outer boundary: [Ai-guard](https://github.com/hunghvt-cyber/Ai-guard) + Bubblewrap
+- Clay's internal sandbox remains enabled inside the outer Guard.
+- Secret injection uses the Guard secret-FD mechanism; the API key is not intentionally placed in argv or the workspace.
+- Real NAS end-to-end test returned `AI_GUARD_CLAY_OK`.
+- Current proof requires explicit `--network host`; Guard's default remains network `none`.
+
+Detailed durable handoff: [docs/CLAY_GUARD_CHECKPOINT.md](docs/CLAY_GUARD_CHECKPOINT.md).
+
 ## Status
 
 Initial repository setup. Architecture and workflow are intentionally kept small while Gemini CLI and OpenCode are evaluated.
