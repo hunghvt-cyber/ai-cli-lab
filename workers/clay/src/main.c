@@ -36,7 +36,7 @@ int main(int argc, char **argv) {
     }
     if (!one_shot_prompt) clay_banner(CLAY_VERSION);
 
-    ClayApp *app = clay_app_create();
+    ClayApp *app = clay_app_create_with_io(clay_app_tui_io());
     ClayCommands *commands = clay_commands_create(app);
     clay_commands_register(commands);
     if (!clay_commands_has_provider(commands) &&
