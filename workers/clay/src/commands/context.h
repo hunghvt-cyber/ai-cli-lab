@@ -223,8 +223,6 @@ void clay_cmd_resume(const char *args, void *user_data);
 void clay_cmd_history(const char *args, void *user_data);
 void clay_cmd_memory(const char *args, void *user_data);
 void clay_cmd_new(const char *args, void *user_data);
-void clay_cmd_mm(const char *args, void *user_data);
-void clay_cmd_demo(const char *args, void *user_data);
 void clay_cmd_sandbox(const char *args, void *user_data);
 void clay_cmd_exec(const char *args, void *user_data);
 void clay_cmd_checkpoints(const char *args, void *user_data);
