@@ -26,7 +26,7 @@ TARGET    := $(BIN_DIR)/clay
 WORKER_TARGET := $(BIN_DIR)/clay-worker
 
 # Test files live in tests/ and have their own main().
-SRC      := $(filter-out src/commands/demo.c src/commands/mm.c,$(shell find src -name '*.c'))
+SRC      := $(filter-out src/commands/demo.c src/commands/mm.c src/worker_main.c,$(shell find src -name '*.c'))
 # src/sandbox/ has one file per OS - each target only builds its own.
 SRC_NIX  := $(filter-out src/sandbox/win32.c,$(SRC))
 SRC_WIN  := $(filter-out src/sandbox/linux.c,$(SRC))
