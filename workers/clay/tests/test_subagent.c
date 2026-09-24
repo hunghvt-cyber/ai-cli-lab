@@ -46,9 +46,6 @@ int main(void) {
     memset(&commands, 0, sizeof(commands));
     clay_array_init(&commands.tasks, sizeof(ClayBackgroundTask *));
     clay_array_init(&commands.plan.todos, sizeof(ClayTodoItem));
-    clay_array_init(&commands.mcp_bindings, sizeof(ClayMcpToolBinding));
-    clay_array_init(&commands.mcp_servers, sizeof(ClayMcpServer *));
-    commands.mcp_connect_attempted = 1; /* no servers to dial in a test */
     commands.mode = CLAY_MODE_ACT;
 
     ClayJson *result = call(&commands, "{\"tasks\":[]}");

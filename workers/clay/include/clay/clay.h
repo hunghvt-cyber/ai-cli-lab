@@ -14,7 +14,6 @@
 #include "clay/crypto.h"
 #include "clay/encoding.h"
 #include "clay/list.h"
-#include "clay/mcp.h"
 #include "clay/memory.h"
 #include "clay/mm.h"
 #include "clay/model_select.h"

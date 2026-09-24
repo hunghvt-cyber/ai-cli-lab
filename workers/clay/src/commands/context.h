@@ -119,10 +119,6 @@ struct ClayCommands {
                                                               only */
   ClayCommandsMode mode;
   ClayPlan plan; /* the session's own checklist, session-only, not persisted */
-  ClayArray
-      mcp_servers; /* ClayMcpServer*, connected for the life of the session */
-  ClayArray mcp_bindings; /* ClayMcpToolBinding, one per discovered MCP tool */
-  int mcp_connect_attempted;
   ClayArray undo_history; /* ClayUndoEntry, newest entry last */
   ClayUndoEntry undo_pending;
   int undo_pending_valid;
@@ -188,11 +184,6 @@ int clay_commands_maybe_compact(ClayCommands *commands);
 /* Frees every item and empties `plan` in place (keeping the array, ready
    for more steps). A rendered plan also clears its row. */
 void clay_plan_clear(ClayPlan *plan);
-/* Connects to every configured MCP server (src/commands/mcp.c) the first
-   time it's called in this session; later calls are a no-op. Best-effort -
-   a server that fails to connect is skipped with a warning, not fatal. */
-void clay_commands_connect_mcp_servers(ClayCommands *commands);
-void clay_cmd_mcp(const char *args, void *user_data);
 void clay_cmd_autotest(const char *args, void *user_data);
 void clay_cmd_compact(const char *args, void *user_data);
 /* Flattens `conversation` (skipping the system prompt at index 0) into a
