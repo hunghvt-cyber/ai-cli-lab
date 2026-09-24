@@ -94,12 +94,9 @@
   "change, verify it, say what you did. Reach for a plan only when " \
   "the job has several real parts." \
   "\n\n" \
-  "When a job is that big, write the plan first with todowrite, in " \
-  "steps a person could tick off, then work through them one at a " \
-  "time. That checklist is the plan the user reads: do not spell it " \
-  "out in prose as well, do not print a tree of files you are about " \
-  "to create, and do not announce each step before taking it. Write " \
-  "the plan, do the work, then say what came of it." \
+  "When a job has several real parts, keep the steps in your working " \
+  "context, execute them one at a time, verify each result, and then " \
+  "say what came of it." \
   "\n\n" \
   "# Comments and writing" \
   "\n\n" \
@@ -154,18 +151,6 @@
   "it printed by then, so a stuck command never stalls the session; " \
   "raise timeout_seconds for a slow build or test run." \
   "\n\n" \
-  "A command that only ends when someone stops it belongs in " \
-  "task_run, not shell_exec: it starts in the background and " \
-  "returns as soon as it has had a moment to fail. task_output " \
-  "shows what a task has printed and whether it is still alive, " \
-  "task_stop ends it, and task_list shows everything running. The " \
-  "usual shape is task_run the server, shell_exec a curl against " \
-  "it, read task_output if the curl looks wrong, then task_stop. " \
-  "Stop what you started before your turn ends; nothing else will." \
-  "\n\n" \
-  "repo_map ranks the workspace's top-level definitions; use it to " \
-  "orient in unfamiliar code before opening files one by one." \
-  "\n\n" \
   "The user can put you in Plan mode with /plan to discuss an " \
   "approach before anything changes: write and edit are refused " \
   "there and mutating shell commands are blocked. A blocked tool " \
@@ -176,7 +161,7 @@
   "auto_test_failed means the configured command failed after that " \
   "change. Read auto_test_output and fix it before moving on." \
   "\n\n" \
-  "# Memory and plan" \
+  "# Memory" \
   "\n\n" \
   "You have two kinds of memory. Long-term memory (memory_save, " \
   "memory_read) persists across every future chat: save a decision, " \
@@ -186,12 +171,6 @@
   "chat's scratchpad, replayed every turn even after older messages " \
   "are dropped: pin details you will still need many turns from " \
   "now." \
-  "\n\n" \
-  "For any task with more than a couple of steps, call todowrite " \
-  "with the full plan before starting, and again whenever a step " \
-  "changes state; the user sees it as a live checklist. Keep " \
-  "exactly one task in_progress and mark it completed before " \
-  "starting the next. Skip it for a single quick action." \
   "\n\n" \
   "# Replies" \
   "\n\n" \
@@ -1163,18 +1142,6 @@ int clay_commands_maybe_compact(ClayCommands *commands) {
   return collapsed;
 }
 
-void clay_plan_clear(ClayPlan *plan) {
-  for (size_t i = 0; i < plan->todos.count; i++) {
-    ClayTodoItem *item = clay_array_get(&plan->todos, i);
-    free(item->content);
-    free(item->status);
-    free(item->shown);
-  }
-  clay_array_clear(&plan->todos);
-  if (plan->rendered)
-    clay_below_set_enabled("plan", 0);
-}
-
 void clay_commands_new_chat(ClayCommands *commands) {
   clay_chat_destroy(commands->chat);
   commands->chat = NULL;
@@ -1186,7 +1153,6 @@ void clay_commands_new_chat(ClayCommands *commands) {
   clay_below_stop_elapsed("status");
   clay_below_set_enabled("status", 0);
   clay_commands_set_tokens_below(commands, 0, 0);
-  clay_plan_clear(&commands->plan);
 }
 
 int clay_commands_select_model(ClayCommands *commands, const char *provider,
@@ -1338,10 +1304,7 @@ ClayCommands *clay_commands_create(ClayApp *app) {
         clay_permissions_category_name((ClayPermissionCategory)i));
     clay_array_init(&commands->remembered_patterns[i], sizeof(char *));
   }
-  clay_array_init(&commands->plan.todos, sizeof(ClayTodoItem));
-  commands->plan.rendered = 1;
   clay_array_init(&commands->undo_history, sizeof(ClayUndoEntry));
-  clay_array_init(&commands->tasks, sizeof(ClayBackgroundTask *));
   if (clay_sandbox_supported())
     commands->sandbox_namespaces = clay_sandbox_namespaces_create();
   pthread_mutexattr_t tool_lock_attributes;
@@ -1373,13 +1336,7 @@ ClayCommands *clay_commands_create(ClayApp *app) {
   clay_below_set_enabled("hint", 0);
   clay_below_add(5, "mode");
   clay_below_set_enabled("mode", 0);
-  /* Not droppable: while a plan is running, the step in flight is the most
-     useful thing on the row. */
-  clay_below_add(6, "plan");
-  clay_below_set_enabled("plan", 0);
-  clay_below_add(7, "tasks");
-  clay_below_set_enabled("tasks", 0);
-  clay_below_add(8, "sandbox");
+  clay_below_add(6, "sandbox");
   clay_below_set_alignment("sandbox", CLAY_BELOW_ALIGN_RIGHT);
   clay_commands_set_tokens_below(commands, 0, 0);
   clay_commands_update_selected_below(commands);
@@ -1390,7 +1347,6 @@ ClayCommands *clay_commands_create(ClayApp *app) {
 void clay_commands_destroy(ClayCommands *commands) {
   if (!commands)
     return;
-  clay_commands_stop_tasks(commands);
   clay_sandbox_namespaces_destroy(commands->sandbox_namespaces);
   pthread_mutex_destroy(&commands->tool_lock);
   free(commands->environment_block);
@@ -1409,7 +1365,6 @@ void clay_commands_destroy(ClayCommands *commands) {
       free(*(char **)clay_array_get(remembered, j));
     clay_array_free(remembered);
   }
-  clay_plan_clear(&commands->plan);
   clay_array_free(&commands->plan.todos);
   clay_commands_undo_destroy(commands);
   free(commands->auto_test_command);
