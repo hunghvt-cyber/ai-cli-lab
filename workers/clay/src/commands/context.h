@@ -162,7 +162,6 @@ char *clay_commands_list_top_level(const char *dir);
 int clay_commands_maybe_compact(ClayCommands *commands);
 /* Frees every item and empties `plan` in place (keeping the array, ready
    for more steps). A rendered plan also clears its row. */
-void clay_plan_clear(ClayPlan *plan);
 void clay_cmd_autotest(const char *args, void *user_data);
 void clay_cmd_compact(const char *args, void *user_data);
 /* Flattens `conversation` (skipping the system prompt at index 0) into a
@@ -231,7 +230,6 @@ void clay_cmd_exec(const char *args, void *user_data);
 void clay_cmd_checkpoints(const char *args, void *user_data);
 void clay_cmd_permissions(const char *args, void *user_data);
 void clay_cmd_plan(const char *args, void *user_data);
-void clay_cmd_tasks(const char *args, void *user_data);
 void clay_cmd_undo(const char *args, void *user_data);
 
 /* Captures and commits one file-level undo entry around a write/edit. The
