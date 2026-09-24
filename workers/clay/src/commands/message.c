@@ -286,7 +286,7 @@ static int authorize_shell_command(char *const argv[], void *user_data) {
 
 static ClayJson *shell_exec_tool(const ClayJson *arguments, void *userdata) {
   ClayCommands *commands = userdata;
-  /* A command can change anything; parallel subagents take turns. */
+  /* A command can change anything; parallel tool operations take turns. */
   pthread_mutex_lock(&commands->tool_lock);
   const char *command =
       clay_json_string_value(clay_json_object_get(arguments, "command"));
@@ -1013,9 +1013,6 @@ static void tool_label(ClayStr *out, const char *name, int completed,
   else if (strcmp(name, "task_list") == 0)
     verb = completed ? (success ? "Listed tasks" : "Failed to list tasks")
                      : "Listing tasks";
-  else if (strcmp(name, "subagent") == 0)
-    verb = completed ? (success ? "Subagent done" : "Subagent failed")
-                     : "Delegating";
   if (verb) {
     clay_str_push(out, verb);
     if (detail && *detail) {
@@ -1037,8 +1034,6 @@ static const char *tool_detail_key(const char *name) {
     return "path";
   if (strcmp(name, "task_run") == 0)
     return "command";
-  if (strcmp(name, "subagent") == 0)
-    return "description";
   if (strcmp(name, "glob") == 0 || strcmp(name, "grep") == 0)
     return "pattern";
   return NULL;
@@ -1316,7 +1311,7 @@ static void add_tool(ClayToolSet *set, const char *name, const char *description
 }
 
 void clay_commands_tools_build(ClayCommands *commands, ClayPlan *plan,
-                               ClayToolSet *set, int allow_subagent) {
+                               ClayToolSet *set) {
   clay_array_init(&set->tools, sizeof(ClayTool));
   clay_array_init(&set->schemas, sizeof(ClayJson *));
   add_tool(set, "shell_exec",
@@ -1380,20 +1375,11 @@ void clay_commands_tools_build(ClayCommands *commands, ClayPlan *plan,
            "Lists this session's background tasks and their status.",
            task_list_schema(), task_list_tool, commands);
 
-  /* A subagent gets everything except the two tools that only make sense
-     for the agent talking to the user. */
-  if (allow_subagent) {
-    add_tool(set, "ask_user",
-             "Asks the user one question in their terminal, with options to "
-             "pick from, and returns their answer. Use it when an unknown "
-             "would change what you build.",
-             ask_user_schema(), ask_user_tool, commands);
-    add_tool(set, "subagent",
-             "Hands one self-contained step of a larger job to a fresh agent "
-             "that starts with no conversation history, works on its own, and "
-             "returns a summary. For big multi-part work only.",
-             subagent_schema(), subagent_tool, commands);
-  }
+  add_tool(set, "ask_user",
+           "Asks the user one question in their terminal, with options to "
+           "pick from, and returns their answer. Use it when an unknown "
+           "would change what you build.",
+           ask_user_schema(), ask_user_tool, commands);
 }
 
 void clay_commands_tools_free(ClayToolSet *set) {
@@ -1471,7 +1457,7 @@ int clay_commands_run_message(ClayCommands *commands, const char *input) {
   show_thinking(&stream);
   clay_app_set_state(commands->app, CLAY_APP_BUSY);
   ClayToolSet tools;
-  clay_commands_tools_build(commands, &commands->plan, &tools, 1);
+  clay_commands_tools_build(commands, &commands->plan, &tools);
   if (clay_term_is_interactive())
     clay_term_raw_enable();
   int rc = clay_commands_run_completion(commands, messages, &tools,
