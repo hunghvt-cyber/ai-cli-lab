@@ -559,42 +559,6 @@ static ClayJson *remember_schema(void) {
   return schema;
 }
 
-static ClayJson *skill_tool(const ClayJson *arguments, void *userdata) {
-  (void)userdata;
-  const char *name =
-      clay_json_string_value(clay_json_object_get(arguments, "name"));
-  ClayJson *result = clay_json_object();
-  char *content = clay_skill_read(name);
-  if (!content) {
-    clay_json_object_set(result, "ok", clay_json_bool(0));
-    clay_json_object_set(result, "error",
-                         clay_json_string("no enabled skill with that name"));
-    return result;
-  }
-  clay_json_object_set(result, "ok", clay_json_bool(1));
-  clay_json_object_set(result, "content", clay_json_string(content));
-  free(content);
-  return result;
-}
-
-static ClayJson *skill_schema(void) {
-  ClayJson *name = clay_json_object();
-  clay_json_object_set(name, "type", clay_json_string("string"));
-  clay_json_object_set(
-      name, "description",
-      clay_json_string("Name from the skill index in your system prompt."));
-  ClayJson *properties = clay_json_object();
-  clay_json_object_set(properties, "name", name);
-  ClayJson *required = clay_json_array();
-  clay_json_array_push(required, clay_json_string("name"));
-  ClayJson *schema = clay_json_object();
-  clay_json_object_set(schema, "type", clay_json_string("object"));
-  clay_json_object_set(schema, "properties", properties);
-  clay_json_object_set(schema, "required", required);
-  clay_json_object_set(schema, "additionalProperties", clay_json_bool(0));
-  return schema;
-}
-
 static ClayJson *ask_user_error(const char *message) {
   ClayJson *result = clay_json_object();
   clay_json_object_set(result, "ok", clay_json_bool(0));
@@ -1399,10 +1363,6 @@ void clay_commands_tools_build(ClayCommands *commands, ClayPlan *plan,
            "unfamiliar codebase before "
            "reading specific files.",
            clay_fs_tool_repo_map_schema(), clay_fs_tool_repo_map, commands);
-  add_tool(set, "skill",
-           "Loads one skill's full instructions by name from the index in your "
-           "system prompt. Call it before starting a task a skill covers.",
-           skill_schema(), skill_tool, commands);
   add_tool(set, "task_run",
            "Starts a command in the background and returns right away. For "
            "anything that keeps running until you stop it: a dev server, a "

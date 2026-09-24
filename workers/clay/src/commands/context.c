@@ -957,14 +957,6 @@ static char *build_fresh_system_prompt(void) {
     clay_str_printf(&text, "\n\nLong-term memory index:\n%s", index);
   free(index);
 
-  char *skills = clay_skill_index();
-  if (*skills)
-    clay_str_printf(&text,
-                    "\n\nAvailable skills (call the skill tool with one name "
-                    "to load its full instructions):\n%s",
-                    skills);
-  free(skills);
-
   char *project_instructions = clay_commands_load_project_instructions();
   if (project_instructions) {
     clay_str_printf(&text, "\n\nProject instructions (AGENTS.md/CLAY.md):\n%s",
@@ -977,7 +969,7 @@ static char *build_fresh_system_prompt(void) {
 
 /* Reuses the cached prompt while it is recent enough that the provider's
    own prefix cache is plausibly still warm; otherwise rebuilds with current
-   memory/skill data. Only ever
+   memory data. Only ever
    called for a chat-less session - clay_commands_reset_conversation
    never calls this once commands->chat exists. */
 static char *clay_commands_build_system_prompt(void) {
@@ -994,9 +986,9 @@ static char *clay_commands_build_system_prompt(void) {
             strcmp(cached_cwd, cwd) == 0;
   free(cached_cwd);
   if (hit) {
-    /* Deliberately not re-stamped: the window runs from when the memory and
-       skill indexes in this text were read, not from the last session that
-       happened to reuse it. */
+    /* Deliberately not re-stamped: the window runs from when the memory
+       index in this text was read, not from the last session that happened
+       to reuse it. */
     free(cwd);
     return cached_text;
   }

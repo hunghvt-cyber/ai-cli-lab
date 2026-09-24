@@ -20,7 +20,6 @@
 #include "clay/oauth.h"
 #include "clay/prompt.h"
 #include "clay/render.h"
-#include "clay/skill.h"
 #include "clay/sse.h"
 #include "clay/storage.h"
 #include "clay/task.h"
