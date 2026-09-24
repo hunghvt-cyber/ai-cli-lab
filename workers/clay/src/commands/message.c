@@ -410,7 +410,7 @@ static ClayJson *shell_exec_tool(const ClayJson *arguments, void *userdata) {
         clay_json_string("timed out and was killed; the output above is what "
                          "it produced first. Raise timeout_seconds for a slow "
                          "one-shot command, or start a long-running one with "
-                         "task_run instead."));
+                         "a separate long-running background task."));
   }
   clay_str_free(&output);
   clay_str_free(&invocation);
@@ -681,124 +681,6 @@ ClayJson *ask_user_schema(void) {
   return schema;
 }
 
-static int valid_todo_status(const char *status) {
-  return strcmp(status, "pending") == 0 || strcmp(status, "in_progress") == 0 ||
-         strcmp(status, "completed") == 0;
-}
-
-ClayJson *todowrite_tool(const ClayJson *arguments, void *userdata) {
-  ClayPlan *plan = userdata;
-  const ClayJson *todos = clay_json_object_get(arguments, "todos");
-  ClayJson *result = clay_json_object();
-  if (clay_json_type(todos) != CLAY_JSON_ARRAY) {
-    clay_json_object_set(result, "ok", clay_json_bool(0));
-    clay_json_object_set(result, "error",
-                         clay_json_string("todos must be an array"));
-    return result;
-  }
-
-  ClayArray items;
-  clay_array_init(&items, sizeof(ClayTodoItem));
-  for (size_t i = 0; i < clay_json_array_count(todos); i++) {
-    ClayJson *entry = clay_json_array_get(todos, i);
-    const char *content =
-        clay_json_string_value(clay_json_object_get(entry, "content"));
-    const char *status =
-        clay_json_string_value(clay_json_object_get(entry, "status"));
-    if (!content || !*content || !status || !valid_todo_status(status)) {
-      for (size_t j = 0; j < items.count; j++) {
-        ClayTodoItem *item = clay_array_get(&items, j);
-        free(item->content);
-        free(item->status);
-      }
-      clay_array_free(&items);
-      clay_json_object_set(result, "ok", clay_json_bool(0));
-      clay_json_object_set(
-          result, "error",
-          clay_json_string("each todo needs non-empty content and status "
-                           "pending/in_progress/completed"));
-      return result;
-    }
-    /* Same step text as before means the same step: keep what the screen
-       already shows for it, so only real movement gets printed. */
-    char *shown = NULL;
-    for (size_t j = 0; j < plan->todos.count; j++) {
-      ClayTodoItem *previous = clay_array_get(&plan->todos, j);
-      if (strcmp(previous->content, content) == 0 && previous->shown) {
-        shown = strdup(previous->shown);
-        break;
-      }
-    }
-    ClayTodoItem item = {strdup(content), strdup(status), shown};
-    clay_array_push_val(&items, &item);
-  }
-
-  clay_plan_clear(plan);
-  clay_array_free(&plan->todos);
-  plan->todos = items;
-
-  ClayStr output;
-  clay_str_init(&output);
-  for (size_t i = 0; i < plan->todos.count; i++) {
-    ClayTodoItem *item = clay_array_get(&plan->todos, i);
-    const char *box = strcmp(item->status, "completed") == 0 ? CLAY_ICON_CHECK
-                      : strcmp(item->status, "in_progress") == 0
-                          ? CLAY_ICON_ARROW
-                          : CLAY_ICON_DOT;
-    clay_str_printf(&output, "[%s] %s\n", box, item->content);
-  }
-  clay_json_object_set(result, "ok", clay_json_bool(1));
-  clay_json_object_set(result, "output", clay_json_string(output.data));
-  clay_json_object_set(result, "output_truncated", clay_json_bool(0));
-  clay_str_free(&output);
-  return result;
-}
-
-ClayJson *todowrite_schema(void) {
-  ClayJson *content = clay_json_object();
-  clay_json_object_set(content, "type", clay_json_string("string"));
-  clay_json_object_set(content, "description",
-                       clay_json_string("One task, in imperative form."));
-  ClayJson *status = clay_json_object();
-  clay_json_object_set(status, "type", clay_json_string("string"));
-  ClayJson *status_enum = clay_json_array();
-  clay_json_array_push(status_enum, clay_json_string("pending"));
-  clay_json_array_push(status_enum, clay_json_string("in_progress"));
-  clay_json_array_push(status_enum, clay_json_string("completed"));
-  clay_json_object_set(status, "enum", status_enum);
-  ClayJson *item_properties = clay_json_object();
-  clay_json_object_set(item_properties, "content", content);
-  clay_json_object_set(item_properties, "status", status);
-  ClayJson *item_required = clay_json_array();
-  clay_json_array_push(item_required, clay_json_string("content"));
-  clay_json_array_push(item_required, clay_json_string("status"));
-  ClayJson *item_schema = clay_json_object();
-  clay_json_object_set(item_schema, "type", clay_json_string("object"));
-  clay_json_object_set(item_schema, "properties", item_properties);
-  clay_json_object_set(item_schema, "required", item_required);
-  clay_json_object_set(item_schema, "additionalProperties", clay_json_bool(0));
-
-  ClayJson *todos = clay_json_object();
-  clay_json_object_set(todos, "type", clay_json_string("array"));
-  clay_json_object_set(todos, "items", item_schema);
-  clay_json_object_set(
-      todos, "description",
-      clay_json_string("The full plan, replacing whatever was there before - "
-                       "resend every task, not just the "
-                       "one that changed. Exactly one task should be "
-                       "in_progress at a time."));
-  ClayJson *properties = clay_json_object();
-  clay_json_object_set(properties, "todos", todos);
-  ClayJson *required = clay_json_array();
-  clay_json_array_push(required, clay_json_string("todos"));
-  ClayJson *schema = clay_json_object();
-  clay_json_object_set(schema, "type", clay_json_string("object"));
-  clay_json_object_set(schema, "properties", properties);
-  clay_json_object_set(schema, "required", required);
-  clay_json_object_set(schema, "additionalProperties", clay_json_bool(0));
-  return schema;
-}
-
 static ClayJson *shell_exec_schema(void) {
   ClayJson *command = clay_json_object();
   clay_json_object_set(command, "type", clay_json_string("string"));
@@ -815,7 +697,7 @@ static ClayJson *shell_exec_schema(void) {
       timeout, "description",
       clay_json_string("Seconds to wait before the command is killed "
                        "(default 120, max 3600). A command that blocks until "
-                       "you stop it belongs in task_run, not here."));
+                       "use shell_exec with a suitable timeout."));
   ClayJson *properties = clay_json_object();
   clay_json_object_set(properties, "command", command);
   clay_json_object_set(properties, "args", args);
@@ -992,27 +874,9 @@ static void tool_label(ClayStr *out, const char *name, int completed,
     verb = completed ? (success ? "Found files" : "Glob failed") : "Globbing";
   else if (strcmp(name, "grep") == 0)
     verb = completed ? (success ? "Searched" : "Search failed") : "Searching";
-  else if (strcmp(name, "todowrite") == 0)
-    verb = completed ? (success ? "Updated plan" : "Failed to update plan")
-                     : "Updating plan";
-  else if (strcmp(name, "repo_map") == 0)
-    verb = completed ? (success ? "Mapped repo" : "Repo map failed")
-                     : "Mapping repo";
   else if (strcmp(name, "ask_user") == 0)
     verb = completed ? (success ? "Asked the user" : "Question unanswered")
                      : "Asking the user";
-  else if (strcmp(name, "task_run") == 0)
-    verb = completed ? (success ? "Started background task" : "Failed to start")
-                     : "Starting background task";
-  else if (strcmp(name, "task_output") == 0)
-    verb = completed ? (success ? "Read task output" : "No such task")
-                     : "Reading task output";
-  else if (strcmp(name, "task_stop") == 0)
-    verb = completed ? (success ? "Stopped task" : "No such task")
-                     : "Stopping task";
-  else if (strcmp(name, "task_list") == 0)
-    verb = completed ? (success ? "Listed tasks" : "Failed to list tasks")
-                     : "Listing tasks";
   if (verb) {
     clay_str_push(out, verb);
     if (detail && *detail) {
@@ -1032,8 +896,6 @@ static const char *tool_detail_key(const char *name) {
   if (strcmp(name, "read") == 0 || strcmp(name, "write") == 0 ||
       strcmp(name, "edit") == 0)
     return "path";
-  if (strcmp(name, "task_run") == 0)
-    return "command";
   if (strcmp(name, "glob") == 0 || strcmp(name, "grep") == 0)
     return "pattern";
   return NULL;
@@ -1106,54 +968,6 @@ static void print_tool_output(const ClayJson *result, int show_command,
   clay_str_free(&line);
 }
 
-/* Prints the steps that moved since the last time the plan was drawn, and
-   points the live status row at whichever one is running now. */
-static void render_plan(ClayCommands *commands) {
-  const ClayTodoItem *active = NULL;
-  size_t done = 0;
-  for (size_t i = 0; i < commands->plan.todos.count; i++) {
-    ClayTodoItem *item = clay_array_get(&commands->plan.todos, i);
-    int completed = strcmp(item->status, "completed") == 0;
-    int running = strcmp(item->status, "in_progress") == 0;
-    if (completed)
-      done++;
-    if (running && !active)
-      active = item;
-    if (!item->shown || strcmp(item->shown, item->status) != 0) {
-      clay_plan_step(completed     ? CLAY_STEP_DONE
-                     : running     ? CLAY_STEP_ACTIVE
-                                   : CLAY_STEP_PENDING,
-                     item->content);
-      free(item->shown);
-      item->shown = strdup(item->status);
-    }
-  }
-  if (!active || commands->plan.todos.count == 0) {
-    clay_below_set_enabled("plan", 0);
-    return;
-  }
-  /* The row is shared with the model, the token counts and the mode, so the
-     step gets a short label rather than its whole sentence. */
-  size_t bytes = 0;
-  int columns = 0;
-  while (active->content[bytes] && columns < CLAY_PLAN_STEP_COLUMNS) {
-    unsigned char c = (unsigned char)active->content[bytes];
-    bytes += (c & 0xE0) == 0xC0 ? 2 : (c & 0xF0) == 0xE0 ? 3 : (c & 0xF8) == 0xF0 ? 4 : 1;
-    columns++;
-  }
-  ClayStr text;
-  clay_str_init(&text);
-  clay_str_printf(&text, "%s%zu/%zu%s ", clay_color(CLAY_GRAY), done + 1,
-                  commands->plan.todos.count, clay_color(CLAY_RESET));
-  clay_str_push_n(&text, active->content, bytes);
-  if (active->content[bytes])
-    clay_str_push(&text, "\xe2\x80\xa6");
-  clay_below_set_text("plan", text.data);
-  clay_below_set_state("plan", CLAY_BELOW_LOADING);
-  clay_below_set_enabled("plan", 1);
-  clay_str_free(&text);
-}
-
 static void on_tool_call(const char *name, const char *arguments_json,
                          void *userdata) {
   ClayConversationStream *stream = userdata;
@@ -1174,10 +988,8 @@ static void on_tool_call(const char *name, const char *arguments_json,
   clay_str_init(&label);
   tool_label(&label, name, 0, 0, detail);
   clay_json_free(args);
-  if (strcmp(name, "todowrite") != 0) {
-    stream->tool_task = clay_task_start("%s", label.data);
-    stream->commands->active_tool_task = stream->tool_task;
-  }
+  stream->tool_task = clay_task_start("%s", label.data);
+  stream->commands->active_tool_task = stream->tool_task;
   clay_str_free(&label);
 }
 
@@ -1198,17 +1010,6 @@ static void on_tool_result(const char *name, const ClayJson *result,
           ? clay_json_string_value(clay_json_object_get(result, detail_key))
           : NULL;
   int error_in_label = 0;
-  if (strcmp(name, "todowrite") == 0) {
-    if (ok)
-      render_plan(stream->commands);
-    else
-      clay_sayc(CLAY_RED, "Plan rejected: %s",
-                clay_json_string_value(clay_json_object_get(result, "error")));
-    if (clay_term_is_interactive())
-      clay_term_raw_enable();
-    show_thinking(stream);
-    return;
-  }
   if (stream->tool_task) {
     ClayStr label;
     clay_str_init(&label);
@@ -1310,8 +1111,7 @@ static void add_tool(ClayToolSet *set, const char *name, const char *description
   clay_array_push_val(&set->tools, &tool);
 }
 
-void clay_commands_tools_build(ClayCommands *commands, ClayPlan *plan,
-                               ClayToolSet *set) {
+void clay_commands_tools_build(ClayCommands *commands, ClayToolSet *set) {
   clay_array_init(&set->tools, sizeof(ClayTool));
   clay_array_init(&set->schemas, sizeof(ClayJson *));
   add_tool(set, "shell_exec",
@@ -1347,33 +1147,6 @@ void clay_commands_tools_build(ClayCommands *commands, ClayPlan *plan,
   add_tool(set, "grep",
            "Searches file contents in the workspace for a regular expression.",
            clay_fs_tool_grep_schema(), grep_tool_gated, commands);
-  add_tool(set, "todowrite",
-           "Writes the full task plan, shown to the user as a checklist. Use for "
-           "any multi-step task.",
-           todowrite_schema(), todowrite_tool, plan);
-  add_tool(set, "repo_map",
-           "Lists the workspace's top-level definitions (functions, classes, "
-           "structs, ...) ranked by how "
-           "often each is referenced elsewhere. Good for orienting in an "
-           "unfamiliar codebase before "
-           "reading specific files.",
-           clay_fs_tool_repo_map_schema(), clay_fs_tool_repo_map, commands);
-  add_tool(set, "task_run",
-           "Starts a command in the background and returns right away. For "
-           "anything that keeps running until you stop it: a dev server, a "
-           "watcher, a tail.",
-           task_run_schema(), task_run_tool, commands);
-  add_tool(set, "task_output",
-           "Returns what a background task has printed so far, plus whether it "
-           "is still running.",
-           task_output_schema(), task_output_tool, commands);
-  add_tool(set, "task_stop",
-           "Stops a background task and returns its exit status and final "
-           "output.",
-           task_stop_schema(), task_stop_tool, commands);
-  add_tool(set, "task_list",
-           "Lists this session's background tasks and their status.",
-           task_list_schema(), task_list_tool, commands);
 
   add_tool(set, "ask_user",
            "Asks the user one question in their terminal, with options to "
@@ -1457,7 +1230,7 @@ int clay_commands_run_message(ClayCommands *commands, const char *input) {
   show_thinking(&stream);
   clay_app_set_state(commands->app, CLAY_APP_BUSY);
   ClayToolSet tools;
-  clay_commands_tools_build(commands, &commands->plan, &tools);
+  clay_commands_tools_build(commands, &tools);
   if (clay_term_is_interactive())
     clay_term_raw_enable();
   int rc = clay_commands_run_completion(commands, messages, &tools,
