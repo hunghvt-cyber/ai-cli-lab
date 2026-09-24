@@ -1,8 +1,5 @@
 #include "clay/app.h"
 
-#include "clay/list.h"
-#include "clay/task.h"
-
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,17 +11,28 @@ struct ClayApp {
     void *listener_ctx;
     void *user_data;
     int active_tasks;
+    const ClayAppIO *io;
 };
 
-ClayApp *clay_app_create(void) {
+static const ClayAppIO *default_io(void) {
+    return clay_app_headless_io();
+}
+
+ClayApp *clay_app_create_with_io(const ClayAppIO *io) {
     ClayApp *app = malloc(sizeof(ClayApp));
+    if (!app) return NULL;
     app->state = CLAY_APP_IDLE;
     app->commands = clay_command_registry_create();
     app->listener = NULL;
     app->listener_ctx = NULL;
     app->user_data = NULL;
     app->active_tasks = 0;
+    app->io = io ? io : default_io();
     return app;
+}
+
+ClayApp *clay_app_create(void) {
+    return clay_app_create_with_io(NULL);
 }
 
 void clay_app_destroy(ClayApp *app) {
@@ -44,9 +52,8 @@ ClayAppState clay_app_state(const ClayApp *app) {
 void clay_app_set_state(ClayApp *app, ClayAppState state) {
     ClayAppState old = app->state;
     app->state = state;
-    if (app->listener && old != state) {
+    if (app->listener && old != state)
         app->listener(app, old, state, app->listener_ctx);
-    }
 }
 
 void clay_app_on_state_change(ClayApp *app, ClayAppStateListener listener, void *ctx) {
@@ -62,30 +69,31 @@ void clay_app_set_data(ClayApp *app, void *data) {
     app->user_data = data;
 }
 
+static void format_message(char *buf, size_t size, const char *fmt, va_list args) {
+    vsnprintf(buf, size, fmt, args);
+}
+
 void clay_app_say(ClayApp *app, const char *fmt, ...) {
-    (void)app;
     char buf[1024];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
+    format_message(buf, sizeof(buf), fmt, args);
     va_end(args);
-    clay_say("%s", buf);
+    app->io->say(buf);
 }
 
 void clay_app_list_header(ClayApp *app, const char *fmt, ...) {
-    (void)app;
     char buf[1024];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
+    format_message(buf, sizeof(buf), fmt, args);
     va_end(args);
-    clay_list_header("%s", buf);
+    app->io->list_header(buf);
 }
 
 void clay_app_list_step(ClayApp *app, int index, const char *verb, const char *target,
-                         const char *info, int link) {
-    (void)app;
-    clay_list_step(index, verb, target, info, link);
+                        const char *info, int link) {
+    app->io->list_step(index, verb, target, info, link);
 }
 
 ClayTask *clay_app_task_start(ClayApp *app, const char *fmt, ...) {
@@ -95,9 +103,9 @@ ClayTask *clay_app_task_start(ClayApp *app, const char *fmt, ...) {
     char buf[1024];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
+    format_message(buf, sizeof(buf), fmt, args);
     va_end(args);
-    return clay_task_start("%s", buf);
+    return app->io->task_start(buf);
 }
 
 static void app_task_finished(ClayApp *app) {
@@ -109,9 +117,9 @@ void clay_app_task_success(ClayApp *app, ClayTask *task, const char *fmt, ...) {
     char buf[1024];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
+    format_message(buf, sizeof(buf), fmt, args);
     va_end(args);
-    clay_task_success(task, "%s", buf);
+    app->io->task_success(task, buf);
     app_task_finished(app);
 }
 
@@ -119,37 +127,31 @@ void clay_app_task_fail(ClayApp *app, ClayTask *task, const char *fmt, ...) {
     char buf[1024];
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, args);
+    format_message(buf, sizeof(buf), fmt, args);
     va_end(args);
-    clay_task_fail(task, "%s", buf);
+    app->io->task_fail(task, buf);
     app_task_finished(app);
 }
 
 int clay_app_select(ClayApp *app, const char *question, const ClayChoice *options, int count,
-                     int default_index) {
+                    int default_index) {
     clay_app_set_state(app, CLAY_APP_PROMPTING);
-    clay_task_render_pause();
-    int result = clay_prompt_select(question, options, count, default_index);
-    clay_task_render_resume();
+    int result = app->io->select(question, options, count, default_index);
     clay_app_set_state(app, CLAY_APP_IDLE);
     return result;
 }
 
 int clay_app_confirm(ClayApp *app, const char *question, int default_yes) {
     clay_app_set_state(app, CLAY_APP_PROMPTING);
-    clay_task_render_pause();
-    int result = clay_prompt_confirm(question, default_yes);
-    clay_task_render_resume();
+    int result = app->io->confirm(question, default_yes);
     clay_app_set_state(app, CLAY_APP_IDLE);
     return result;
 }
 
 int clay_app_choice(ClayApp *app, const char *question, const ClayChoice *choices, int count,
-                     int allow_custom, char **custom_out) {
+                    int allow_custom, char **custom_out) {
     clay_app_set_state(app, CLAY_APP_PROMPTING);
-    clay_task_render_pause();
-    int result = clay_prompt_choice(question, choices, count, allow_custom, custom_out);
-    clay_task_render_resume();
+    int result = app->io->choice(question, choices, count, allow_custom, custom_out);
     clay_app_set_state(app, CLAY_APP_IDLE);
     return result;
 }
