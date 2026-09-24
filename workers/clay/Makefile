@@ -23,6 +23,7 @@ LDFLAGS ?= -lpthread $(CURL_LDFLAGS)
 BUILD_DIR := build
 BIN_DIR   := bin
 TARGET    := $(BIN_DIR)/clay
+WORKER_TARGET := $(BIN_DIR)/clay-worker
 
 # Test files live in tests/ and have their own main().
 SRC      := $(filter-out src/commands/demo.c src/commands/mm.c,$(shell find src -name '*.c'))
@@ -31,6 +32,11 @@ SRC_NIX  := $(filter-out src/sandbox/win32.c,$(SRC))
 SRC_WIN  := $(filter-out src/sandbox/linux.c,$(SRC))
 OBJ      := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SRC_NIX))
 DEP      := $(OBJ:.o=.d)
+# Headless worker: same proven core, but no interactive main or TUI adapter.
+WORKER_SRC := $(filter-out src/main.c src/commands/app_tui.c,$(SRC_NIX))
+WORKER_OBJ := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(WORKER_SRC))
+WORKER_OBJ += $(BUILD_DIR)/worker_main.o
+WORKER_DEP := $(WORKER_OBJ:.o=.d)
 
 # Size-oriented release build. It deliberately disables LTO so it remains
 # portable across toolchains while still removing unreachable sections.
@@ -164,6 +170,8 @@ all: build
 
 build: $(TARGET)
 
+worker: $(WORKER_TARGET)
+
 release: $(TARGET_RELEASE)
 
 $(TARGET_RELEASE): $(OBJ_RELEASE) | $(BIN_DIR_RELEASE)
@@ -175,6 +183,9 @@ $(BUILD_DIR_RELEASE)/%.o: src/%.c
 
 $(TARGET): $(OBJ) | $(BIN_DIR)
 	$(CC) $(OBJ) -o $@ $(LDFLAGS)
+
+$(WORKER_TARGET): $(WORKER_OBJ) | $(BIN_DIR)
+	$(CC) $(WORKER_OBJ) -o $@ $(LDFLAGS)
 
 test: $(UNIT_TEST_TARGETS)
 	@set -e; for test_binary in $^; do ./$$test_binary; done
@@ -367,6 +378,7 @@ clean:
 	rm -rf $(BUILD_DIR) $(BIN_DIR) $(BUILD_DIR_WIN) $(BIN_DIR_WIN) $(BUILD_DIR_RELEASE) $(BIN_DIR_RELEASE)
 
 -include $(DEP)
+-include $(WORKER_DEP)
 -include $(DEP_WIN)
 -include $(DEP_RELEASE)
 -include $(TEST_DEP)
