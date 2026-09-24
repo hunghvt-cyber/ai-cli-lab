@@ -44,20 +44,6 @@ typedef struct {
   int after_exists;
 } ClayUndoEntry;
 
-typedef struct {
-  char *content;
-  char *status;   /* "pending", "in_progress", or "completed" */
-  char *shown;    /* the status already on screen, so a redraw prints only
-                     the steps that actually moved. NULL until printed. */
-} ClayTodoItem;
-
-/* Where a todowrite call writes. The session has one plan, which is drawn
-   for the user; it is isolated from the main conversation. */
-typedef struct {
-  ClayArray todos; /* ClayTodoItem */
-  int rendered;    /* draw it in the transcript and the status row */
-} ClayPlan;
-
 /* Approval categories, independent of the sandbox (namespace) axis: whether
    a tool call needs the user's OK before it runs at all. */
 typedef enum {
@@ -78,10 +64,6 @@ typedef enum {
 
 /* Whether the user has agreed to let the configured auto-test command run
    after edits, asked once per session (not once per edit). */
-/* One backgrounded shell command (src/commands/tasks.c). Opaque: a
-   reader thread owns its output buffer. */
-typedef struct ClayBackgroundTask ClayBackgroundTask;
-
 typedef enum {
   CLAY_AUTO_TEST_UNASKED,
   CLAY_AUTO_TEST_ALLOWED,
@@ -118,7 +100,6 @@ struct ClayCommands {
                                                               for this session
                                                               only */
   ClayCommandsMode mode;
-  ClayPlan plan; /* the session's own checklist, session-only, not persisted */
   ClayArray undo_history; /* ClayUndoEntry, newest entry last */
   ClayUndoEntry undo_pending;
   int undo_pending_valid;
@@ -128,8 +109,6 @@ struct ClayCommands {
      unchanged one is never appended twice. */
   char *environment_block;
   char *notes_block;
-  ClayArray tasks; /* ClayBackgroundTask*, background commands this session */
-  int next_task_id;
   /* The spinner row of the tool call running right now, for a long call that
      wants to report progress on it. NULL between calls. */
   ClayTask *active_tool_task;
@@ -285,13 +264,6 @@ void clay_fs_walk_files(const char *base_dir, const char *rel_prefix,
                         const char *pattern, ClayArray *matches,
                         int *truncated);
 
-/* Heuristic repo map (src/commands/repo_map.c): ranked top-level symbol
-   definitions across the workspace, via ctags if installed, else a
-   per-language line-heuristic fallback. Not gated by clay_permissions_check
-   - it returns only symbol names/kinds/line numbers, not file content. */
-ClayJson *clay_fs_tool_repo_map(const ClayJson *arguments, void *userdata);
-ClayJson *clay_fs_tool_repo_map_schema(void);
-
 /* Every tool one agent turn can call, plus the schema objects those tools
    borrow. Built by clay_commands_tools_build, released by
    clay_commands_tools_free. */
@@ -301,8 +273,7 @@ typedef struct {
 } ClayToolSet;
 
 /* Builds the tools available to the interactive agent. */
-void clay_commands_tools_build(ClayCommands *commands, ClayPlan *plan,
-                               ClayToolSet *set);
+void clay_commands_tools_build(ClayCommands *commands, ClayToolSet *set);
 void clay_commands_tools_free(ClayToolSet *set);
 
 /* Rounds of tool calls one agent gets before the provider loop stops and
@@ -319,33 +290,11 @@ int clay_commands_run_completion(ClayCommands *commands, ClayJson *messages,
                                  const char *cache_key,
                                  const ClayOpenAICallbacks *callbacks);
 
-/* Plan/checklist tool (src/commands/message.c). Replaces the plan it was
-   built with, wholesale, on each call. userdata is a ClayPlan*. */
-ClayJson *todowrite_tool(const ClayJson *arguments, void *userdata);
-ClayJson *todowrite_schema(void);
-
 /* Interactive question tool (src/commands/message.c). Blocks on the choice
    widget; fails instead of prompting when stdin/stdout is not a tty.
    userdata is a ClayCommands*. */
 ClayJson *ask_user_tool(const ClayJson *arguments, void *userdata);
 ClayJson *ask_user_schema(void);
-
-/* Background command tools (src/commands/tasks.c). task_run starts a
-   command on its own thread and returns as soon as it has had a moment to
-   fail; the others read, stop, and list what is running. userdata is a
-   ClayCommands*. */
-ClayJson *task_run_tool(const ClayJson *arguments, void *userdata);
-ClayJson *task_run_schema(void);
-ClayJson *task_output_tool(const ClayJson *arguments, void *userdata);
-ClayJson *task_output_schema(void);
-ClayJson *task_stop_tool(const ClayJson *arguments, void *userdata);
-ClayJson *task_stop_schema(void);
-ClayJson *task_list_tool(const ClayJson *arguments, void *userdata);
-ClayJson *task_list_schema(void);
-
-/* Stops every background task, waits for its thread, and empties the
-   registry. */
-void clay_commands_stop_tasks(ClayCommands *commands);
 
 /* Snapshots the workspace into the chat's checkpoint repo before a tool
    call that may change it. Best-effort: a failed snapshot never blocks the
