@@ -1,0 +1,16 @@
+/build/
+/bin/
+/build-win/
+/bin-win/
+/bin-release/
+/build-release/
+/bin-*/
+/build-*/
+*.o
+*.d
+*.exe
+
+.playground/
+investigation/
+REPORT.md
+.tmp/
