@@ -2,8 +2,6 @@
 
 void clay_commands_register(ClayCommands *commands) {
     ClayCommandRegistry *registry = clay_app_commands(commands->app);
-    clay_command_register(registry, "help", "Show available commands", clay_cmd_help, commands);
-    clay_command_register(registry, "exit", "Quit clay", clay_cmd_exit, commands);
     clay_command_register(registry, "model", "Pick a model from a connected provider", clay_cmd_model, commands);
     clay_command_register_alias(registry, "models", clay_cmd_model, commands);
     clay_command_register_alias(registry, "provider", clay_cmd_connect, commands);
@@ -17,7 +15,6 @@ void clay_commands_register(ClayCommands *commands) {
     clay_command_register_alias(registry, "clear", clay_cmd_new, commands);
     clay_command_register(registry, "connect", "Connect a provider, or /connect <id> directly", clay_cmd_connect, commands);
     clay_command_register_alias(registry, "login", clay_cmd_connect, commands);
-    clay_command_register(registry, "logout", "Log out from a connected provider", clay_cmd_logout, commands);
     clay_command_register(registry, "sandbox", "Configure the shell sandbox (mode, outside-workspace access)",
                           clay_cmd_sandbox, commands);
     clay_command_register_alias(registry, "__cycle_sandbox", clay_cmd_cycle_sandbox, commands);
