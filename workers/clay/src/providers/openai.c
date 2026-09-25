@@ -244,6 +244,8 @@ typedef struct {
   ClayStr id;
   ClayStr name;
   ClayStr arguments;
+  /* Optional provider metadata; empty for providers that do not send it. */
+  ClayStr google_thought_signature;
 } ClayToolCallAccum;
 
 typedef struct {
@@ -277,6 +279,7 @@ static void stream_state_free(ClayStreamState *st) {
     clay_str_free(&tc->id);
     clay_str_free(&tc->name);
     clay_str_free(&tc->arguments);
+    clay_str_free(&tc->google_thought_signature);
   }
   clay_array_free(&st->tool_calls);
   clay_sse_destroy(st->sse);
@@ -297,6 +300,7 @@ static ClayToolCallAccum *tool_call_at(ClayArray *calls, size_t index) {
   clay_str_init(&tc.id);
   clay_str_init(&tc.name);
   clay_str_init(&tc.arguments);
+  clay_str_init(&tc.google_thought_signature);
   clay_array_push_val(calls, &tc);
   return clay_array_get(calls, calls->count - 1);
 }
@@ -399,6 +403,19 @@ static int process_sse_data(const char *json_text, ClayStreamState *st) {
     if (clay_json_type(args) == CLAY_JSON_STRING &&
         append_limited(&acc->arguments, clay_json_string_value(args),
                        strlen(clay_json_string_value(args)),
+                       CLAY_OPENAI_TOOL_FIELD_LIMIT) != 0) {
+      clay_json_free(root);
+      return -1;
+    }
+
+    ClayJson *extra_content = clay_json_object_get(tc, "extra_content");
+    ClayJson *google = clay_json_object_get(extra_content, "google");
+    ClayJson *signature =
+        clay_json_object_get(google, "thought_signature");
+    if (clay_json_type(signature) == CLAY_JSON_STRING &&
+        append_limited(&acc->google_thought_signature,
+                       clay_json_string_value(signature),
+                       strlen(clay_json_string_value(signature)),
                        CLAY_OPENAI_TOOL_FIELD_LIMIT) != 0) {
       clay_json_free(root);
       return -1;
@@ -507,6 +524,17 @@ static void handle_tool_calls(ClayJson *messages, const ClayTool *tools,
     clay_json_object_set(call, "id", clay_json_string(tc->id.data));
     clay_json_object_set(call, "type", clay_json_string("function"));
     clay_json_object_set(call, "function", fn);
+
+    if (tc->google_thought_signature.len > 0) {
+      ClayJson *google = clay_json_object();
+      clay_json_object_set(
+          google, "thought_signature",
+          clay_json_string(tc->google_thought_signature.data));
+      ClayJson *extra_content = clay_json_object();
+      clay_json_object_set(extra_content, "google", google);
+      clay_json_object_set(call, "extra_content", extra_content);
+    }
+
     clay_json_array_push(tool_calls_json, call);
   }
   clay_json_object_set(assistant, "tool_calls", tool_calls_json);
