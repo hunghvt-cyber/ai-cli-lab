@@ -6,7 +6,46 @@ GUARD=/vol1/Docker/Ai-guard
 WORKER="$REPO/workers/clay/bin/clay-worker"
 WORKSPACE=/vol1/Docker/tapo-nas-lab
 PROMPT="$REPO/docs/prompts/tapo-backup-retention-audit-primitives.txt"
-KEY="${1:-1}"
+PROVIDER=""
+KEY=""
+
+# Interactive by default; keep legacy "2" => Gemini key 2 compatibility.
+if [ "$#" -eq 0 ]; then
+  echo "=== AI Provider Selector ==="
+  echo "1. Gemini"
+  echo "2. Groq"
+  read -r -p "Select provider [1-2]: " provider_choice
+  case "$provider_choice" in
+    1) PROVIDER="gemini" ;;
+    2) PROVIDER="groq" ;;
+    *) echo "ERROR: provider must be 1 or 2" >&2; exit 1 ;;
+  esac
+elif [[ "${1:-}" =~ ^[1-5]$ ]]; then
+  PROVIDER="gemini"
+  KEY="$1"
+elif [ "$1" = "gemini" ] || [ "$1" = "groq" ]; then
+  PROVIDER="$1"
+  KEY="${2:-}"
+else
+  echo "ERROR: usage: $0 [gemini [1-5]|groq|1-5]" >&2
+  exit 1
+fi
+
+if [ "$PROVIDER" = "gemini" ] && [ -z "$KEY" ]; then
+  echo
+  echo "=== Gemini Key Selector ==="
+  echo "1. KEY1"
+  echo "2. KEY2"
+  echo "3. KEY3"
+  echo "4. KEY4"
+  echo "5. KEY5"
+  read -r -p "Select key [1-5]: " KEY
+fi
+
+if [ "$PROVIDER" = "gemini" ] && ! [[ "$KEY" =~ ^[1-5]$ ]]; then
+  echo "ERROR: Gemini key must be 1..5" >&2
+  exit 1
+fi
 
 if [ ! -f "$PROMPT" ]; then
   echo "ERROR: missing prompt: $PROMPT" >&2
@@ -31,8 +70,10 @@ mkdir -p "$log_dir"
 live_log="$log_dir/live.log"
 
 echo "=== Tapo backup/retention primitive audit ==="
-echo "Provider: Gemini"
-echo "Gemini key: $KEY"
+echo "Provider: $PROVIDER"
+if [ "$PROVIDER" = "gemini" ]; then
+  echo "Gemini key: $KEY"
+fi
 echo "Workspace: $WORKSPACE"
 echo "Audit: READ-ONLY"
 echo "Primitive shell discipline: ENABLED"
@@ -41,8 +82,8 @@ echo
 
 set +e
 "$GUARD/adapters/clay" \
-  --provider gemini \
-  --gemini-key "$KEY" \
+  --provider "$PROVIDER" \
+  ${KEY:+--gemini-key "$KEY"} \
   --worker "$WORKER" \
   --workspace "$WORKSPACE" \
   --network host \
@@ -73,8 +114,10 @@ report="docs/audits/tapo-backup-retention-primitives-${date_utc}.md"
   echo "# Tapo/NAS Backup and Retention Primitive Audit"
   echo
   echo "- Date (UTC): $date_utc"
-  echo "- Provider: Gemini"
-  echo "- Gemini key selector: $KEY"
+  echo "- Provider: $PROVIDER"
+  if [ "$PROVIDER" = "gemini" ]; then
+    echo "- Gemini key selector: $KEY"
+  fi
   echo "- Workspace: $WORKSPACE"
   echo "- Scope: READ-ONLY"
   echo "- Shell discipline: one safe command per tool call"
