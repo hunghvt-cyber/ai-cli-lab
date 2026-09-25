@@ -34,10 +34,10 @@ Clay internal sandbox
   ↓
 shell / file tools
   ↓
-Groq / Gemini
+Gemini ×5 / Groq / OpenRouter
 ```
 
-AI Guard is the **outer enforcement boundary**. Clay's own sandbox remains a **secondary inner isolation layer**.
+AI Guard is the outer enforcement boundary. Clay's own sandbox remains a secondary inner isolation layer.
 
 ChatGPT is the architect/decision layer. The worker is an execution layer.
 
@@ -56,7 +56,7 @@ Successful reductions include:
 - ClayApp/TUI separation
 - stable headless `clay-worker` target
 
-The failed TUI task-renderer deletion was restored and must **not** be treated as a successful reduction.
+The failed TUI task-renderer deletion was restored and must not be treated as a successful reduction.
 
 The current worker target is:
 
@@ -66,23 +66,52 @@ workers/clay/bin/clay-worker
 
 It is a dynamically linked ARM64/aarch64 executable and requires the host's normal runtime libraries.
 
-## Clay worker functional facts
-
-### Groq
-
-- Provider: `groq`
-- Model: `openai/gpt-oss-120b`
-- API base: `https://api.groq.com/openai/v1`
+## Provider state
 
 ### Gemini
 
-- Provider path: Clay `custom` provider
-- Model: `gemini-3.1-flash-lite`
-- API base: `https://generativelanguage.googleapis.com/v1beta/openai`
-- Five Gemini keys are stored outside GitHub/workspace and selected manually.
+- Five-key pool.
+- Provider path: Clay `custom`.
+- Model: `gemini-3.1-flash-lite`.
+- API base: `https://generativelanguage.googleapis.com/v1beta/openai`.
+- Five Gemini keys are stored outside GitHub/workspace.
 - No automatic rotation, cooldown, or failover is used.
+- Real-NAS guarded Tapo test passed.
 
-Standalone and guarded tests confirmed that Gemini 3.1 Flash-Lite is reachable through the OpenAI-compatible endpoint.
+### Groq
+
+- Provider: `groq`.
+- Model: `openai/gpt-oss-120b`.
+- API base: `https://api.groq.com/openai/v1`.
+- Real-NAS guarded Tapo test passed.
+- Full long audit attempt hit the provider's 8K TPM limit.
+
+### OpenRouter
+
+- Provider path: Clay `custom`.
+- API base: `https://openrouter.ai/api/v1`.
+- Current configured model is stored outside GitHub in `openrouter.env`.
+- Real-NAS one-shot integration passed:
+  `OpenRouter → Clay → AI Guard → Bubblewrap → Tapo workspace`.
+- Full Tapo audit attempt was blocked by OpenRouter's free-model daily limit (HTTP 429).
+- Retain OpenRouter as a fallback provider; do not treat the failed full audit as a Tapo audit result.
+
+### Dropped providers
+
+- SambaNova: dropped after completion requests returned authentication failure.
+- Mistral: dropped after previous experiments; not part of the current runtime pool.
+
+Current active provider pool:
+
+```
+Gemini ×5
+Groq
+OpenRouter
+```
+
+Do not add another provider unless an existing provider becomes unusable for a concrete operational reason.
+
+## Clay worker functional facts
 
 Standalone worker tests previously passed:
 
@@ -125,16 +154,7 @@ The adapter is:
 adapters/clay
 ```
 
-It:
-
-1. receives a Clay worker path;
-2. stages the worker through AI Guard as a read-only program;
-3. receives the selected provider credential outside the workspace;
-4. writes the secret temporarily with restrictive permissions;
-5. injects the secret into Bubblewrap through the Guard secret-FD mechanism;
-6. injects only the required non-secret provider/model variables;
-7. defaults network policy to `none`;
-8. requires explicit `--network host` for the current provider integrations because egress-only networking is not implemented yet.
+It stages the worker through AI Guard, injects the selected provider credential through the Guard secret-FD mechanism, injects required non-secret provider/model variables, defaults network policy to `none`, and requires explicit `--network host` for the current provider integrations.
 
 The outer Guard uses `--clearenv` before adding explicitly allowed environment variables.
 
@@ -142,127 +162,78 @@ API keys are not intentionally placed in the worker command line or workspace.
 
 ## Real-NAS integration validation — PASS
 
-The following real-NAS paths were validated:
-
-```
-/vol1/Docker/tapo-nas-lab
-/vol1/Docker/ai-cli-lab/workers/clay/bin/clay-worker
-/vol1/Docker/Ai-guard
-```
-
-### AI Guard regression
-
-The full Guard regression suite passed:
-
-```
-guarded program
-secret environment
-non-secret environment
-filesystem
-workspace guard
-policy guard
-root guard
-home
-docker sockets
-capabilities/session
-pid namespace
-network namespace
-network host mode
-symlink escape
-
-ALL TESTS PASSED
-```
-
-### Tapo workspace security
-
 The real Tapo workspace passed the Guard isolation test:
 
 - `/workspace` is writable and usable.
 - `/vol1` is not visible.
 - host `/home/admin/.ssh` is not visible.
 - host `/root/.ssh` is not visible.
+- only the intended Tapo repository path is allowlisted.
 
-The adapter/Guard allowlist permits only the intended Tapo repository path and continues to reject general `/vol1` paths.
+Guard regression suite passed.
 
 ### Groq → Tapo
 
-Observed successful result:
+Observed:
 
 ```
-◆ Agent (openai/gpt-oss-120b)
-
-  GROQ_TAPO_FINAL_OK
+GROQ_TAPO_FINAL_OK
 ```
 
 ### Gemini → Tapo
 
-Observed successful result:
+Observed:
 
 ```
-◆ Agent (gemini-3.1-flash-lite)
-
-  GEMINI_TAPO_FINAL_OK
+GEMINI_TAPO_FINAL_OK
 ```
 
-The Gemini selector displayed all five keys, and the explicitly selected key's last-used state was updated without exposing the secret value.
+### OpenRouter → Tapo
 
-These tests prove the two provider paths can execute the Clay worker inside AI Guard against the real Tapo workspace.
-
-## Multi-provider design
-
-Current provider roles:
-
-- Groq = primary
-- Gemini 3.1 Flash-Lite = backup
-- Provider #3 = reserved
-
-Credential locations on the NAS:
+Observed:
 
 ```
-~/.config/clay/groq.env
-~/.config/clay/gemini-keys
-~/.config/clay/state/gemini-key-last-used
+OPENROUTER_CLAY_OK
 ```
 
-Credential files are outside the repositories and workspace.
+These prove the three active provider paths can execute the Clay worker through AI Guard against the real Tapo workspace.
 
-The old Gemini infrastructure remains separate and has **not** been deleted.
+## Central secret store
 
-Do not delete `/vol1/Docker/gemini` until the operator explicitly approves that cleanup.
+Current intended provider secret store:
+
+```
+/vol1/Docker/ai-cli-lab/secrets/
+├── groq.env
+├── gemini-keys
+├── openrouter.env
+└── state/
+    └── gemini-key-last-used
+```
+
+Secret values must never be committed, printed, or exposed in audit output.
+
+The old `/vol1/Docker/gemini` infrastructure remains separate and must not be deleted without explicit approval.
 
 ## Important boundaries
 
-Do **not** weaken either sandbox merely to make a future test pass.
+Do not weaken either sandbox, broaden filesystem exposure, expose Docker sockets, put API keys into argv/workspace, or make network access implicit.
 
-In particular, do not immediately:
-
-- disable Clay's internal sandbox;
-- remove user namespaces;
-- bypass `uidmap`;
-- broaden filesystem exposure;
-- expose `/vol1`;
-- expose Docker sockets;
-- put API keys into argv;
-- put API keys into the workspace;
-- make network access implicit.
-
-If a future integration test fails, preserve the exact failure output first and diagnose the specific layer.
+If a future integration test fails, preserve exact failure output and diagnose the specific layer.
 
 ## Current network limitation
 
-The current working provider proofs use:
+The working provider proofs use:
 
 ```
 --network host
 ```
 
-This is deliberate. AI Guard does not yet have an egress-only policy for allowing only the required provider endpoint.
+AI Guard does not yet have an egress-only policy for allowing only the required provider endpoint.
 
 Do not silently change the default from `none` to broad networking.
 
 ## Source-of-truth workflow
-
-Use:
 
 ```
 GitHub source of truth
@@ -275,31 +246,13 @@ PASS → keep/commit
 FAIL → rollback
 ```
 
-Avoid fragile direct edits on the NAS when a repository change is appropriate.
+## Next operational task: Tapo backup/retention audit
 
-## Current checkpoint
-
-The Clay + AI Guard multi-provider integration is now a **verified PASS checkpoint** on the real NAS.
-
-The verified state includes:
-
-1. Guard regression suite PASS.
-2. Groq → Clay → Guard → Tapo workspace PASS.
-3. Gemini → Clay → Guard → Tapo workspace PASS.
-4. Five-key Gemini selector/state path PASS.
-5. Groq regression after Gemini integration PASS.
-6. Gemini API URL corrected to the no-trailing-slash OpenAI-compatible base path.
-7. Tapo workspace allowlist committed in AI Guard.
-
-Do not continue reducing Clay solely for LOC reduction. Future work should first be driven by a demonstrated functional or security requirement.
-
-## Next operational task
-
-Use the verified Clay + AI Guard path to perform a **read-only audit of the Tapo backup and retention system**.
+The next task remains a **read-only audit of the actual Tapo backup and retention system**.
 
 Audit scope:
 
-- actual `tapo-nas-lab` backup/upload/archive/manifest/reconciliation/retention files;
+- actual backup/upload/archive/manifest/reconciliation/retention files;
 - actual NAS paths;
 - cron/systemd timers/services;
 - recent logs and execution evidence;
@@ -314,28 +267,32 @@ Audit scope:
 - current backup source of truth;
 - D-7 retention implementation and gaps.
 
-Audit rules:
-
-- read-only;
-- do not upload;
-- do not delete;
-- do not restart services;
-- do not install packages;
-- do not modify recorder/Event Logger;
-- do not modify production recordings;
-- report facts and evidence before proposing changes.
-
-Target retention policy:
+Target policy:
 
 ```
 Rolling D-7
 
 newer than 7 days → KEEP
-age >= 7 days → eligible for deletion only after remote backup verification
+age >= 7 days → eligible only after remote backup verification
 active file being written → NEVER delete
 ```
 
-Historical cleanup rules from September 2026 are not production retention logic.
+Historical September cleanup rules are not production retention logic.
+
+### Audit security issue to fix before the next run
+
+A previous OpenRouter audit attempt caused the worker to read `/workspace/.secrets/tapo.env` and expose Tapo credential values in the live log.
+
+This means the current audit prompt/worker boundary has **not yet demonstrated sufficient secret exclusion**.
+
+Before the next full audit:
+
+1. explicitly forbid reading `.secrets/`, `.env`, credential files, and provider secret paths;
+2. add runner detection for Tapo credential patterns, including `TAPO_USER` and `TAPO_PASSWORD`;
+3. ensure a detected secret causes a fail-closed stop with no GitHub report;
+4. preserve the existing read-only rule.
+
+Do not weaken the Guard filesystem boundary merely to obtain host-only facts. If a required host fact is not observable from the sandbox, the audit must report `NOT OBSERVABLE` rather than bypassing the boundary.
 
 ## Do not confuse these projects
 
