@@ -1,0 +1,45 @@
+Perform a READ-ONLY audit of the Tapo/NAS backup and retention system.
+
+STRICT:
+- Read-only audit of the target system only.
+- Do not modify, create, upload, delete, move, rename, restart, install, repair, or change anything in the Tapo project, recorder, Event Logger, viewer, recordings, NAS configuration, or Google Drive.
+- Do not expose secrets, API keys, tokens, credentials, or private-key contents.
+- Inspect the real /workspace filesystem and relevant host-visible information available to the worker.
+- Use safe read-only commands only.
+- Do not use recursive ls. Prefer find, printf, cat, sed, awk, stat, grep, systemctl status, systemctl list-timers, crontab -l, and read-only rclone list/ls where available.
+- Do not implement any recommendation.
+
+Audit:
+1. Actual backup/upload/archive/manifest/reconciliation/retention scripts and configs.
+2. Actual NAS recording paths and filename/date structure.
+3. Cron jobs, systemd services and timers related to backup or cleanup.
+4. Recent logs and evidence of actual executions.
+5. Rclone configuration and commands, without revealing credentials.
+6. Remote Google Drive path mapping.
+7. How already-uploaded files are detected.
+8. Retry, failure, partial-upload, and resume behavior.
+9. Whether remote existence AND exact file size are verified before deletion.
+10. Whether an active recorder segment can race with backup or deletion.
+11. Existing cleanup/deletion mechanisms.
+12. Current backup source of truth.
+13. Gap between the current system and desired D-7 retention.
+
+Desired D-7 policy:
+- Files newer than 7 days: KEEP.
+- Files age >= 7 days: eligible for deletion only after remote backup is verified.
+- Remote verification requires existence and exact size match.
+- The currently active recorder file must never be deleted.
+- Historical 13/09-18/09 cleanup rules are NOT production retention logic.
+
+Return a concise evidence-based report with:
+A. EXECUTIVE FACTS
+B. ACTUAL BACKUP PIPELINE
+C. ACTUAL RETENTION PIPELINE
+D. SCHEDULING
+E. VERIFICATION / SAFETY GUARANTEES
+F. D-7 GAP ANALYSIS
+G. OBSOLETE / HISTORICAL COMPONENTS
+H. EVIDENCE - exact paths, commands and non-secret outputs
+I. SMALLEST SAFE IMPLEMENTATION PLAN
+
+Do not implement section I. Stop after the report.
