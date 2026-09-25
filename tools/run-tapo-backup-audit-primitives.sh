@@ -26,7 +26,7 @@ if ! git config user.name >/dev/null 2>&1 || ! git config user.email >/dev/null 
 fi
 
 date_utc="$(date -u +%Y%m%dT%H%M%SZ)"
-log_dir="/tmp/tapo-audit-primitives-\${date_utc}"
+log_dir="/tmp/tapo-audit-primitives-${date_utc}"
 mkdir -p "$log_dir"
 live_log="$log_dir/live.log"
 
@@ -49,7 +49,7 @@ set +e
   -- \
   --cwd /workspace \
   --prompt "$(cat "$PROMPT")" 2>&1 | tee "$live_log"
-clay_status="\${PIPESTATUS[0]}"
+clay_status="${PIPESTATUS[0]}"
 set -e
 
 echo
@@ -67,7 +67,7 @@ if grep -Eiq '(GROQ_API_KEY|GEMINI_API_KEY|CLAY_API_KEY|BEGIN (OPENSSH|RSA|EC|DS
   exit 3
 fi
 
-report="docs/audits/tapo-backup-retention-primitives-\${date_utc}.md"
+report="docs/audits/tapo-backup-retention-primitives-${date_utc}.md"
 
 {
   echo "# Tapo/NAS Backup and Retention Primitive Audit"
