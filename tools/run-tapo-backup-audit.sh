@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -u
+set -euo pipefail
 
 REPO=/vol1/Docker/ai-cli-lab
 GUARD=/vol1/Docker/Ai-guard
@@ -31,6 +31,15 @@ echo "Workspace: $WORKSPACE"
 echo "Audit: READ-ONLY"
 echo
 
+if ! git config user.name >/dev/null 2>&1 || ! git config user.email >/dev/null 2>&1; then
+  echo "ERROR: Git author identity is not configured in this repository." >&2
+  echo "Configure it once with:" >&2
+  echo "  git config user.name \"<your GitHub name>\"" >&2
+  echo "  git config user.email \"<your GitHub email>\"" >&2
+  exit 4
+fi
+echo
+
 if ! "$GUARD/adapters/clay" \
   --provider gemini \
   --gemini-key "$KEY" \
@@ -51,6 +60,7 @@ if grep -Eiq '(GROQ_API_KEY|GEMINI_API_KEY|CLAY_API_KEY|BEGIN (OPENSSH|RSA|EC|DS
 fi
 
 date_utc="$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p docs/audits
 report="docs/audits/tapo-backup-retention-${date_utc}.md"
 {
   echo "# Tapo/NAS Backup and Retention Audit"
