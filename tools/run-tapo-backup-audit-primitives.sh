@@ -51,11 +51,6 @@ if [ ! -f "$PROMPT" ]; then
   echo "ERROR: missing prompt: $PROMPT" >&2
   exit 1
 fi
-if ! [[ "$KEY" =~ ^[1-5]$ ]]; then
-  echo "ERROR: Gemini key must be 1..5" >&2
-  exit 1
-fi
-
 cd "$REPO"
 git pull --ff-only
 
@@ -81,15 +76,26 @@ echo "Live log: $live_log"
 echo
 
 set +e
-"$GUARD/adapters/clay" \
-  --provider "$PROVIDER" \
-  ${KEY:+--gemini-key "$KEY"} \
-  --worker "$WORKER" \
-  --workspace "$WORKSPACE" \
-  --network host \
-  -- \
-  --cwd /workspace \
-  --prompt "$(cat "$PROMPT")" 2>&1 | tee "$live_log"
+if [ "$PROVIDER" = "gemini" ]; then
+  "$GUARD/adapters/clay" \
+    --provider gemini \
+    --gemini-key "$KEY" \
+    --worker "$WORKER" \
+    --workspace "$WORKSPACE" \
+    --network host \
+    -- \
+    --cwd /workspace \
+    --prompt "$(cat "$PROMPT")" 2>&1 | tee "$live_log"
+else
+  "$GUARD/adapters/clay" \
+    --provider groq \
+    --worker "$WORKER" \
+    --workspace "$WORKSPACE" \
+    --network host \
+    -- \
+    --cwd /workspace \
+    --prompt "$(cat "$PROMPT")" 2>&1 | tee "$live_log"
+fi
 clay_status="${PIPESTATUS[0]}"
 set -e
 
