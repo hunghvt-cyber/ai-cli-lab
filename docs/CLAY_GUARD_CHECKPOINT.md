@@ -258,3 +258,43 @@ Potential future work, in separate steps:
 - `tapo-nas-lab`: Tapo/NAS application.
 
 The Clay worker belongs to `ai-cli-lab`; the security boundary belongs to `Ai-guard`.
+
+
+## Multi-provider extension — implementation staged
+
+Date: 2026-09-25
+
+The next integration step is a multi-provider Clay path that keeps the existing Groq integration and adds Gemini without changing the Guard boundary.
+
+Current design:
+
+- Groq remains the primary provider.
+- Gemini 3.1 Flash-Lite uses Google's OpenAI-compatible endpoint.
+- The Gemini path uses `CLAY_PROVIDER=custom`, `CLAY_API_KEY`, `CLAY_BASE_URL`, and `CUSTOM_MODEL`.
+- Five Gemini keys are selected manually; there is no automatic rotation or failover.
+- Key status is stored as name + last-used timestamp only.
+- Provider #3 is reserved through the same generic custom-provider interface.
+- API keys remain outside GitHub and outside the Clay workspace.
+- AI Guard receives only the selected provider credential through its secret-env mechanism.
+
+The AI Guard adapter implementation is in:
+
+```text
+Ai-guard/adapters/clay
+```
+
+Provider setup documentation is in:
+
+```text
+ai-cli-lab/docs/CLAY_MULTI_PROVIDER.md
+```
+
+This extension is **not yet a PASS checkpoint**. It requires real-NAS validation of:
+
+1. Guard regression suite.
+2. Groq → Clay → Guard → Tapo workspace.
+3. Gemini → Clay → Guard → Tapo workspace.
+4. Five-key selector and last-used state.
+5. Groq regression after Gemini integration.
+
+Do not delete the old `/vol1/Docker/gemini` infrastructure until those tests pass and deletion is explicitly approved.
