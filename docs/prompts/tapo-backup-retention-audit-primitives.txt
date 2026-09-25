@@ -1,0 +1,61 @@
+Perform a READ-ONLY audit of the Tapo/NAS backup and retention system.
+
+STRICT SAFETY:
+- Read-only only.
+- Do not create, modify, upload, delete, move, rename, restart, install, repair, or change anything.
+- Never expose API keys, credentials, tokens, private keys, or secret values.
+- Do not implement recommendations.
+- If a host-level fact is not visible from /workspace, report NOT OBSERVABLE. Do not infer it as fact.
+- Do not use recursive ls.
+- Use exactly ONE shell command per tool call.
+
+TOOL-USE DISCIPLINE:
+Treat shell access as these virtual primitives:
+1. list_files(path, depth)
+   - Use POSIX-compatible find only.
+   - Example: find /workspace -maxdepth 3 -not -path '*/.*'
+2. read_file(path)
+   - Use cat or sed only.
+3. search_files(pattern)
+   - Use grep only, with a quoted pattern and explicit path.
+4. stat_file(path)
+   - Use stat only.
+5. run_readonly(command)
+   - Exactly one safe read-only command.
+   - No command chaining.
+   - No &&, ;, pipes, command substitution, or multiple commands in one tool call.
+   - Never invent malformed commands such as ls -R1 or ls -1.
+   - If a command fails, adapt using a simpler valid command; do not retry by concatenating alternatives.
+
+AUDIT:
+1. Actual backup/upload/archive/manifest/reconciliation/retention scripts and configs.
+2. Actual recording paths and filename/date structure.
+3. Cron jobs, systemd services/timers, and recent execution evidence, but only if observable.
+4. Rclone commands/configuration without secrets.
+5. Google Drive remote path mapping.
+6. Already-uploaded detection.
+7. Retry, failure, partial-upload, and resume behavior.
+8. Whether remote existence AND exact file size are verified before deletion.
+9. Whether an active recorder segment can race with backup or deletion.
+10. Existing cleanup/deletion mechanisms.
+11. Current backup source of truth.
+12. Gap versus desired D-7 retention.
+
+Desired D-7 policy:
+- Files newer than 7 days: KEEP.
+- Files age >= 7 days: eligible for deletion only after remote existence AND exact size match.
+- The currently active recorder file must never be deleted.
+- Historical 13/09-18/09 cleanup rules are NOT production retention logic.
+
+Return a concise evidence-based report:
+A. EXECUTIVE FACTS
+B. ACTUAL BACKUP PIPELINE
+C. ACTUAL RETENTION PIPELINE
+D. SCHEDULING
+E. VERIFICATION / SAFETY GUARANTEES
+F. D-7 GAP ANALYSIS
+G. OBSOLETE / HISTORICAL COMPONENTS
+H. EVIDENCE - exact paths, commands and non-secret outputs
+I. SMALLEST SAFE IMPLEMENTATION PLAN
+
+Do not implement section I. Stop after the report.
