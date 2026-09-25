@@ -5,6 +5,7 @@
 #include "clay/sse.h"
 #include "clay/str.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -607,6 +608,8 @@ int clay_openai_run(ClayOpenAI *client, ClayJson *messages,
       return 1;
     }
     if (rc != 0 || resp.status < 200 || resp.status >= 300) {
+      fprintf(stderr, "[clay-http] status=%ld response=%s\n", resp.status,
+              st.raw.data ? st.raw.data : "");
       if (callbacks && callbacks->on_error)
         callbacks->on_error(resp.status, st.raw.data, callbacks->userdata);
       clay_http_response_free(&resp);
