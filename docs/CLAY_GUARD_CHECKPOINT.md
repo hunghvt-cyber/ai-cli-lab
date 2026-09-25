@@ -4,7 +4,7 @@
 
 **PASS — end-to-end integration verified on the NAS.**
 
-Date: 2026-09-24
+Date: 2026-09-25
 
 This document is the durable handoff record for the current Clay Reduction / AI Worker state. Read this before changing the Clay worker or its AI Guard integration.
 
@@ -34,7 +34,7 @@ Clay internal sandbox
   ↓
 shell / file tools
   ↓
-Groq API
+Groq / Gemini
 ```
 
 AI Guard is the **outer enforcement boundary**. Clay's own sandbox remains a **secondary inner isolation layer**.
@@ -68,15 +68,25 @@ It is a dynamically linked ARM64/aarch64 executable and requires the host's norm
 
 ## Clay worker functional facts
 
-Provider used for the current checkpoint:
+### Groq
 
 - Provider: `groq`
 - Model: `openai/gpt-oss-120b`
 - API base: `https://api.groq.com/openai/v1`
 
+### Gemini
+
+- Provider path: Clay `custom` provider
+- Model: `gemini-3.1-flash-lite`
+- API base: `https://generativelanguage.googleapis.com/v1beta/openai`
+- Five Gemini keys are stored outside GitHub/workspace and selected manually.
+- No automatic rotation, cooldown, or failover is used.
+
+Standalone and guarded tests confirmed that Gemini 3.1 Flash-Lite is reachable through the OpenAI-compatible endpoint.
+
 Standalone worker tests previously passed:
 
-- one-shot Groq inference
+- one-shot inference
 - workspace-contained `read_file`
 - workspace escape protection
 - shell tool execution
@@ -119,55 +129,30 @@ It:
 
 1. receives a Clay worker path;
 2. stages the worker through AI Guard as a read-only program;
-3. receives `GROQ_API_KEY` from the operator environment;
+3. receives the selected provider credential outside the workspace;
 4. writes the secret temporarily with restrictive permissions;
 5. injects the secret into Bubblewrap through the Guard secret-FD mechanism;
-6. injects non-secret `CLAY_PROVIDER=groq`;
-7. injects `GROQ_MODEL`;
-8. defaults network policy to `none`;
-9. requires explicit `--network host` for the current Groq integration because egress-only networking is not implemented yet.
+6. injects only the required non-secret provider/model variables;
+7. defaults network policy to `none`;
+8. requires explicit `--network host` for the current provider integrations because egress-only networking is not implemented yet.
 
-The outer Guard uses `--clearenv` before adding the explicitly allowed environment variables.
+The outer Guard uses `--clearenv` before adding explicitly allowed environment variables.
 
-The Groq API key is therefore not intentionally placed in the worker command line or workspace.
+API keys are not intentionally placed in the worker command line or workspace.
 
-## End-to-end proof
+## Real-NAS integration validation — PASS
 
-The following command was executed successfully on the NAS:
-
-```sh
-cd /vol1/Docker/Ai-guard && \
-./adapters/clay \
-  --worker /vol1/Docker/ai-cli-lab/workers/clay/bin/clay-worker \
-  --workspace /tmp/clay-guard-test \
-  --network host \
-  -- \
-  --prompt 'Reply with exactly: AI_GUARD_CLAY_OK'
-```
-
-Observed result:
+The following real-NAS paths were validated:
 
 ```
-◆ Agent (openai/gpt-oss-120b)
-
-  AI_GUARD_CLAY_OK
+/vol1/Docker/tapo-nas-lab
+/vol1/Docker/ai-cli-lab/workers/clay/bin/clay-worker
+/vol1/Docker/Ai-guard
 ```
 
-This proves, in one real run:
+### AI Guard regression
 
-- adapter invocation works;
-- AI Guard program staging works;
-- secret injection works;
-- Bubblewrap starts successfully;
-- the staged ARM64 Clay worker starts successfully;
-- Clay's **nested internal sandbox** starts successfully inside the outer Guard;
-- Groq network access works when explicitly using host networking;
-- the selected Groq model responds;
-- the one-shot worker exits normally.
-
-## AI Guard test status
-
-Before this integration checkpoint, the AI Guard regression suite passed:
+The full Guard regression suite passed:
 
 ```
 guarded program
@@ -188,7 +173,62 @@ symlink escape
 ALL TESTS PASSED
 ```
 
-The current integration therefore builds on an already passing Guard test suite.
+### Tapo workspace security
+
+The real Tapo workspace passed the Guard isolation test:
+
+- `/workspace` is writable and usable.
+- `/vol1` is not visible.
+- host `/home/admin/.ssh` is not visible.
+- host `/root/.ssh` is not visible.
+
+The adapter/Guard allowlist permits only the intended Tapo repository path and continues to reject general `/vol1` paths.
+
+### Groq → Tapo
+
+Observed successful result:
+
+```
+◆ Agent (openai/gpt-oss-120b)
+
+  GROQ_TAPO_FINAL_OK
+```
+
+### Gemini → Tapo
+
+Observed successful result:
+
+```
+◆ Agent (gemini-3.1-flash-lite)
+
+  GEMINI_TAPO_FINAL_OK
+```
+
+The Gemini selector displayed all five keys, and the explicitly selected key's last-used state was updated without exposing the secret value.
+
+These tests prove the two provider paths can execute the Clay worker inside AI Guard against the real Tapo workspace.
+
+## Multi-provider design
+
+Current provider roles:
+
+- Groq = primary
+- Gemini 3.1 Flash-Lite = backup
+- Provider #3 = reserved
+
+Credential locations on the NAS:
+
+```
+~/.config/clay/groq.env
+~/.config/clay/gemini-keys
+~/.config/clay/state/gemini-key-last-used
+```
+
+Credential files are outside the repositories and workspace.
+
+The old Gemini infrastructure remains separate and has **not** been deleted.
+
+Do not delete `/vol1/Docker/gemini` until the operator explicitly approves that cleanup.
 
 ## Important boundaries
 
@@ -210,13 +250,13 @@ If a future integration test fails, preserve the exact failure output first and 
 
 ## Current network limitation
 
-The current working proof uses:
+The current working provider proofs use:
 
 ```
 --network host
 ```
 
-This is deliberate and temporary for the integration checkpoint. AI Guard does not yet have an egress-only policy for allowing only the required Groq endpoint.
+This is deliberate. AI Guard does not yet have an egress-only policy for allowing only the required provider endpoint.
 
 Do not silently change the default from `none` to broad networking.
 
@@ -237,19 +277,65 @@ FAIL → rollback
 
 Avoid fragile direct edits on the NAS when a repository change is appropriate.
 
-## Next step
+## Current checkpoint
 
-The Clay + AI Guard integration is considered a **stable checkpoint**.
+The Clay + AI Guard multi-provider integration is now a **verified PASS checkpoint** on the real NAS.
 
-Do not continue reducing Clay solely for LOC reduction at this point. Future work should first be driven by a demonstrated functional or security requirement.
+The verified state includes:
 
-Potential future work, in separate steps:
+1. Guard regression suite PASS.
+2. Groq → Clay → Guard → Tapo workspace PASS.
+3. Gemini → Clay → Guard → Tapo workspace PASS.
+4. Five-key Gemini selector/state path PASS.
+5. Groq regression after Gemini integration PASS.
+6. Gemini API URL corrected to the no-trailing-slash OpenAI-compatible base path.
+7. Tapo workspace allowlist committed in AI Guard.
 
-1. strengthen/verify AI Guard policy around Clay;
-2. design egress-only network policy for the required provider endpoint;
-3. add more guarded-worker regression tests;
-4. consider additional AI worker adapters (for example future Qwen/other CLI workers);
-5. only then revisit further Clay reduction if there is a concrete reason.
+Do not continue reducing Clay solely for LOC reduction. Future work should first be driven by a demonstrated functional or security requirement.
+
+## Next operational task
+
+Use the verified Clay + AI Guard path to perform a **read-only audit of the Tapo backup and retention system**.
+
+Audit scope:
+
+- actual `tapo-nas-lab` backup/upload/archive/manifest/reconciliation/retention files;
+- actual NAS paths;
+- cron/systemd timers/services;
+- recent logs and execution evidence;
+- rclone configuration and commands without exposing secrets;
+- remote path mapping;
+- already-uploaded detection;
+- retry/error behavior;
+- remote existence plus exact-size verification;
+- active recorder-file protection;
+- existing cleanup/deletion scripts;
+- recording filename/date structure;
+- current backup source of truth;
+- D-7 retention implementation and gaps.
+
+Audit rules:
+
+- read-only;
+- do not upload;
+- do not delete;
+- do not restart services;
+- do not install packages;
+- do not modify recorder/Event Logger;
+- do not modify production recordings;
+- report facts and evidence before proposing changes.
+
+Target retention policy:
+
+```
+Rolling D-7
+
+newer than 7 days → KEEP
+age >= 7 days → eligible for deletion only after remote backup verification
+active file being written → NEVER delete
+```
+
+Historical cleanup rules from September 2026 are not production retention logic.
 
 ## Do not confuse these projects
 
@@ -258,43 +344,3 @@ Potential future work, in separate steps:
 - `tapo-nas-lab`: Tapo/NAS application.
 
 The Clay worker belongs to `ai-cli-lab`; the security boundary belongs to `Ai-guard`.
-
-
-## Multi-provider extension — implementation staged
-
-Date: 2026-09-25
-
-The next integration step is a multi-provider Clay path that keeps the existing Groq integration and adds Gemini without changing the Guard boundary.
-
-Current design:
-
-- Groq remains the primary provider.
-- Gemini 3.1 Flash-Lite uses Google's OpenAI-compatible endpoint.
-- The Gemini path uses `CLAY_PROVIDER=custom`, `CLAY_API_KEY`, `CLAY_BASE_URL`, and `CUSTOM_MODEL`.
-- Five Gemini keys are selected manually; there is no automatic rotation or failover.
-- Key status is stored as name + last-used timestamp only.
-- Provider #3 is reserved through the same generic custom-provider interface.
-- API keys remain outside GitHub and outside the Clay workspace.
-- AI Guard receives only the selected provider credential through its secret-env mechanism.
-
-The AI Guard adapter implementation is in:
-
-```text
-Ai-guard/adapters/clay
-```
-
-Provider setup documentation is in:
-
-```text
-ai-cli-lab/docs/CLAY_MULTI_PROVIDER.md
-```
-
-This extension is **not yet a PASS checkpoint**. It requires real-NAS validation of:
-
-1. Guard regression suite.
-2. Groq → Clay → Guard → Tapo workspace.
-3. Gemini → Clay → Guard → Tapo workspace.
-4. Five-key selector and last-used state.
-5. Groq regression after Gemini integration.
-
-Do not delete the old `/vol1/Docker/gemini` infrastructure until those tests pass and deletion is explicitly approved.
