@@ -3,7 +3,10 @@ Perform a READ-ONLY audit of the Tapo/NAS backup and retention system.
 STRICT SAFETY:
 - Read-only only.
 - Do not create, modify, upload, delete, move, rename, restart, install, repair, or change anything.
-- Never expose API keys, credentials, tokens, private keys, or secret values.
+- Never expose API keys, credentials, tokens, private keys, passwords, usernames, cookies, or secret values.
+- NEVER read, cat, grep, stat, or otherwise inspect any `.secrets/` directory, `.env` file, credential file, password file, API-key file, SSH private key, rclone credential/config file, or provider secret path.
+- Treat filenames containing `secret`, `credential`, `password`, `token`, `api-key`, `apikey`, `rclone.conf`, `.env`, or similar as sensitive and do not open them. You may report that such a file exists without reading its contents.
+- If a command output contains a secret accidentally, stop immediately and do not repeat, quote, summarize, or continue inspecting that source.
 - Do not implement recommendations.
 - If a host-level fact is not visible from /workspace, report NOT OBSERVABLE. Do not infer it as fact.
 - Do not use recursive ls.
