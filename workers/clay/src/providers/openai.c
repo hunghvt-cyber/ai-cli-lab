@@ -236,7 +236,6 @@ void clay_openai_usage_from_json(const ClayJson *usage, ClayTokenUsage *out) {
         usage, "cached_tokens", &out->cached_input_tokens);
 }
 
-/* Provider-neutral tool metadata is preserved below. */
 /* One tool call as it accumulates across streamed deltas: the API sends
    its id/name/argument-fragments as separate events, keyed by `index`. */
 typedef struct {
