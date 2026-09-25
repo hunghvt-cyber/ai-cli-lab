@@ -30,16 +30,16 @@ set -a
 . "$SECRETS"
 set +a
 
-[ -n "\${OPENROUTER_API_KEY:-}" ] || { echo "ERROR: OPENROUTER_API_KEY is missing." >&2; exit 1; }
-[ -n "\${OPENROUTER_BASE_URL:-}" ] || { echo "ERROR: OPENROUTER_BASE_URL is missing." >&2; exit 1; }
-[ -n "\${OPENROUTER_MODEL:-}" ] || { echo "ERROR: OPENROUTER_MODEL is missing." >&2; exit 1; }
+[ -n "${OPENROUTER_API_KEY:-}" ] || { echo "ERROR: OPENROUTER_API_KEY is missing." >&2; exit 1; }
+[ -n "${OPENROUTER_BASE_URL:-}" ] || { echo "ERROR: OPENROUTER_BASE_URL is missing." >&2; exit 1; }
+[ -n "${OPENROUTER_MODEL:-}" ] || { echo "ERROR: OPENROUTER_MODEL is missing." >&2; exit 1; }
 
 export CLAY_API_KEY="$OPENROUTER_API_KEY"
 export CLAY_BASE_URL="$OPENROUTER_BASE_URL"
 export CUSTOM_MODEL="$OPENROUTER_MODEL"
 
 date_utc="$(date -u +%Y%m%dT%H%M%SZ)"
-log_dir="/tmp/tapo-audit-primitives-openrouter-\${date_utc}"
+log_dir="/tmp/tapo-audit-primitives-openrouter-${date_utc}"
 mkdir -p "$log_dir"
 live_log="$log_dir/live.log"
 
@@ -61,7 +61,7 @@ set +e
   -- \
   --cwd /workspace \
   --prompt "$(cat "$PROMPT")" 2>&1 | tee "$live_log"
-clay_status="\${PIPESTATUS[0]}"
+clay_status="${PIPESTATUS[0]}"
 set -e
 
 echo
@@ -79,7 +79,7 @@ if grep -Eiq '(GROQ_API_KEY|GEMINI_API_KEY|OPENROUTER_API_KEY|CLAY_API_KEY|BEGIN
   exit 3
 fi
 
-report="docs/audits/tapo-backup-retention-primitives-openrouter-\${date_utc}.md"
+report="docs/audits/tapo-backup-retention-primitives-openrouter-${date_utc}.md"
 
 {
   echo "# Tapo/NAS Backup and Retention Primitive Audit"
