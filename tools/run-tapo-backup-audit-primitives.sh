@@ -108,7 +108,7 @@ if [ "$clay_status" -ne 0 ]; then
   exit 2
 fi
 
-if grep -Eiq '(GROQ_API_KEY|GEMINI_API_KEY|CLAY_API_KEY|BEGIN (OPENSSH|RSA|EC|DSA) PRIVATE KEY|AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9_-]{20,})' "$live_log"; then
+if grep -Eiq '(GROQ_API_KEY|GEMINI_API_KEY|OPENROUTER_API_KEY|CLAY_API_KEY|TAPO_|PASSWORD|PASSWD|BEGIN (OPENSSH|RSA|EC|DSA) PRIVATE KEY|AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9_-]{20,})' "$live_log"; then
   echo "SAFETY STOP: possible credential material detected; report was NOT committed." >&2
   echo "Live log preserved at: $live_log" >&2
   exit 3
