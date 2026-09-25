@@ -6,7 +6,7 @@ GUARD=/vol1/Docker/Ai-guard
 WORKER="$REPO/workers/clay/bin/clay-worker"
 WORKSPACE=/vol1/Docker/tapo-nas-lab
 PROMPT="$REPO/docs/prompts/tapo-backup-retention-audit-primitives.txt"
-KEY="\${1:-1}"
+KEY="${1:-1}"
 
 if [ ! -f "$PROMPT" ]; then
   echo "ERROR: missing prompt: $PROMPT" >&2
