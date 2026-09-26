@@ -1353,5 +1353,9 @@ int clay_commands_run_message(ClayCommands *commands, const char *input) {
   clay_wrap_free(&stream.wrap);
   clay_str_free(&stream.thinking);
   clay_app_set_state(commands->app, CLAY_APP_IDLE);
-  return 0;
+  /* The one-shot/headless callers treat a nonzero return as success.  Preserve
+     the completion contract here: only a clean completion (rc == 0) is a
+     successful turn; cancellation, provider failure, and out-of-rounds must
+     propagate as failure so automation can fail closed. */
+  return rc == 0 ? 1 : 0;
 }
