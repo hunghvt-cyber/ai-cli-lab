@@ -114,6 +114,7 @@ if grep -Eiq '(GROQ_API_KEY|GEMINI_API_KEY|OPENROUTER_API_KEY|CLAY_API_KEY|TAPO_
   exit 3
 fi
 
+mkdir -p docs/audits
 report="docs/audits/tapo-backup-retention-primitives-${date_utc}.md"
 
 {
