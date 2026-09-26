@@ -387,8 +387,16 @@ static int process_sse_data(const char *json_text, ClayStreamState *st) {
       return -1;
     }
 
-    ClayJson *thought_signature =
-        clay_json_object_get(tc, "thought_signature");
+    /* Gemini's OpenAI compatibility layer carries the signature at
+       tool_call.extra_content.google.thought_signature, not as a top-level
+       tool_call field.  Keep the top-level fallback for providers that expose
+       the field directly. */
+    ClayJson *extra_content = clay_json_object_get(tc, "extra_content");
+    ClayJson *google = clay_json_object_get(extra_content, "google");
+    ClayJson *thought_signature = clay_json_object_get(
+        google, "thought_signature");
+    if (clay_json_type(thought_signature) != CLAY_JSON_STRING)
+      thought_signature = clay_json_object_get(tc, "thought_signature");
     if (clay_json_type(thought_signature) == CLAY_JSON_STRING &&
         append_limited(&acc->thought_signature,
                        clay_json_string_value(thought_signature),
@@ -519,9 +527,14 @@ static void handle_tool_calls(ClayJson *messages, const ClayTool *tools,
     clay_json_object_set(call, "id", clay_json_string(tc->id.data));
     clay_json_object_set(call, "type", clay_json_string("function"));
     clay_json_object_set(call, "function", fn);
-    if (tc->thought_signature.len > 0)
-      clay_json_object_set(call, "thought_signature",
+    if (tc->thought_signature.len > 0) {
+      ClayJson *google = clay_json_object();
+      clay_json_object_set(google, "thought_signature",
                            clay_json_string(tc->thought_signature.data));
+      ClayJson *extra_content = clay_json_object();
+      clay_json_object_set(extra_content, "google", google);
+      clay_json_object_set(call, "extra_content", extra_content);
+    }
     clay_json_array_push(tool_calls_json, call);
   }
   clay_json_object_set(assistant, "tool_calls", tool_calls_json);
