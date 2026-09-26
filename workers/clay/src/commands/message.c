@@ -497,8 +497,7 @@ static ClayJson *memory_read_tool(const ClayJson *arguments, void *userdata) {
   char *content = clay_memory_read(slug);
   if (!content) {
     clay_json_object_set(result, "ok", clay_json_bool(0));
-    clay_json_object_set(result, "error",
-                         clay_json_string("no memory entry with that slug"));
+    clay_json_object_set(result, "error",                         clay_json_string("no memory entry with that slug"));
     return result;
   }
   clay_json_object_set(result, "ok", clay_json_bool(1));
@@ -997,8 +996,7 @@ static void on_tool_result(const char *name, const ClayJson *result,
                            void *userdata) {
   ClayConversationStream *stream = userdata;
   stream->ended_after_tool = 1;
-  int ok = clay_json_bool_value(clay_json_object_get(result, "ok"));
-  long exit_code =
+  int ok = clay_json_bool_value(clay_json_object_get(result, "ok"));  long exit_code =
       (long)clay_json_number_value(clay_json_object_get(result, "exit_code"));
   const char *command =
       clay_json_string_value(clay_json_object_get(result, "command"));
@@ -1088,8 +1086,11 @@ static void on_token(const char *text, void *userdata) {
 
 
 static void on_error(long status, const char *body, void *userdata) {
-  (void)body;
   ((ClayConversationStream *)userdata)->error_status = status;
+  if (body && *body) {
+    fprintf(stderr, "Provider error body (diagnostic, max 4096 bytes): %.4096s\n",
+            body);
+  }
 }
 
 static void on_usage_details(const ClayTokenUsage *usage, void *userdata) {
