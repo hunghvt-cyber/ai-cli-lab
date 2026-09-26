@@ -242,6 +242,7 @@ typedef struct {
   ClayStr id;
   ClayStr name;
   ClayStr arguments;
+  ClayStr thought_signature;
 } ClayToolCallAccum;
 
 typedef struct {
@@ -275,6 +276,7 @@ static void stream_state_free(ClayStreamState *st) {
     clay_str_free(&tc->id);
     clay_str_free(&tc->name);
     clay_str_free(&tc->arguments);
+    clay_str_free(&tc->thought_signature);
   }
   clay_array_free(&st->tool_calls);
   clay_sse_destroy(st->sse);
@@ -295,6 +297,7 @@ static ClayToolCallAccum *tool_call_at(ClayArray *calls, size_t index) {
   clay_str_init(&tc.id);
   clay_str_init(&tc.name);
   clay_str_init(&tc.arguments);
+  clay_str_init(&tc.thought_signature);
   clay_array_push_val(calls, &tc);
   return clay_array_get(calls, calls->count - 1);
 }
@@ -379,6 +382,17 @@ static int process_sse_data(const char *json_text, ClayStreamState *st) {
     if (clay_json_type(id) == CLAY_JSON_STRING &&
         append_limited(&acc->id, clay_json_string_value(id),
                        strlen(clay_json_string_value(id)),
+                       CLAY_OPENAI_TOOL_FIELD_LIMIT) != 0) {
+      clay_json_free(root);
+      return -1;
+    }
+
+    ClayJson *thought_signature =
+        clay_json_object_get(tc, "thought_signature");
+    if (clay_json_type(thought_signature) == CLAY_JSON_STRING &&
+        append_limited(&acc->thought_signature,
+                       clay_json_string_value(thought_signature),
+                       strlen(clay_json_string_value(thought_signature)),
                        CLAY_OPENAI_TOOL_FIELD_LIMIT) != 0) {
       clay_json_free(root);
       return -1;
@@ -505,6 +519,9 @@ static void handle_tool_calls(ClayJson *messages, const ClayTool *tools,
     clay_json_object_set(call, "id", clay_json_string(tc->id.data));
     clay_json_object_set(call, "type", clay_json_string("function"));
     clay_json_object_set(call, "function", fn);
+    if (tc->thought_signature.len > 0)
+      clay_json_object_set(call, "thought_signature",
+                           clay_json_string(tc->thought_signature.data));
     clay_json_array_push(tool_calls_json, call);
   }
   clay_json_object_set(assistant, "tool_calls", tool_calls_json);
