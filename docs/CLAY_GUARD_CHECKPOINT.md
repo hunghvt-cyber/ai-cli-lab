@@ -284,6 +284,22 @@ The old Gemini SSH identity must not be reused for Clay. The dedicated key is in
 - `unleashed-auto` removes Clay's internal approval/sandbox layer. It must therefore only be used where AI Guard is the deliberate security boundary.
 - Do not merge the POC branches or change production defaults without explicit approval.
 
+## GitHub publishing from Clay
+
+**Removed by design — 2026-09-27.**
+
+Clay does not have GitHub write/publishing capability and must not gain it for the Tapo workflow.
+
+Final workflow:
+
+```
+ChatGPT → Clay → AI Guard → FnNAS/Tapo → Clay terminal output → manual copy to ChatGPT
+```
+
+Do not add `gh`, GitHub API credentials, a GitHub publisher, or repository-write capability to the Clay runtime unless this architecture is explicitly revisited.
+
+GitHub remains the source-of-truth repository for code and durable handoff documentation, maintained outside the Clay execution sandbox.
+
 ## Next operational task: Tapo backup/retention audit
 
 The next task remains a **read-only audit of the actual Tapo backup and retention system**.
