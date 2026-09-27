@@ -4,7 +4,7 @@
 
 **PASS — end-to-end integration verified on the NAS.**
 
-Date: 2026-09-25
+Date: 2026-09-26
 
 This document is the durable handoff record for the current Clay Reduction / AI Worker state. Read this before changing the Clay worker or its AI Guard integration.
 
@@ -245,6 +245,44 @@ build/test
 PASS → keep/commit
 FAIL → rollback
 ```
+
+## Clay unleashed POC — PASS
+
+A separate POC verified that Clay can run with its internal sandbox disabled while AI Guard remains the outer enforcement boundary.
+
+Branches (not merged):
+
+- `ai-cli-lab: feat/clay-guard-unleashed`
+- `Ai-guard: feat/clay-unleashed-poc`
+
+The worker reads `CLAY_SANDBOX_MODE` from the environment, allowing the adapter to select `sandbox`, `sandbox-auto`, `unleashed`, or `unleashed-auto` per run. `unleashed-auto` was tested end-to-end on the NAS.
+
+Verified in the POC:
+
+- Groq inference through AI Guard with `unleashed-auto` → PASS.
+- Real shell execution and host-visible workspace write → PASS.
+- `/vol1` outside the allowlist → blocked.
+- `/home/admin/.ssh` → invisible.
+- `/var/run/docker.sock` → not exposed.
+- Dedicated Clay SSH key injection → PASS.
+- SSH to `clay@127.0.0.1` → PASS.
+- `clay` SSH session using `sudo -n id` → `uid=0(root)` → PASS.
+
+Dedicated SSH identity:
+
+- user: `clay`
+- private key: `/home/clay/.ssh/id_ed25519`
+- fingerprint: `SHA256:ua7XubjfwXZKUSk+fkYmVwbLSbAZzsftMmdM43dryDs clay@admin`
+- sudo policy: `clay ALL=(ALL:ALL) NOPASSWD: ALL`
+
+The old Gemini SSH identity must not be reused for Clay. The dedicated key is injected through AI Guard and is not placed in the workspace or argv.
+
+### POC limitations
+
+- Current SSH/provider runtime proofs use `--network host`; no egress-only network policy exists yet.
+- Resource-limit behavior specifically in `unleashed-auto` has not been separately re-proven; existing Clay sandbox resource tests do not establish outer Guard resource enforcement.
+- `unleashed-auto` removes Clay's internal approval/sandbox layer. It must therefore only be used where AI Guard is the deliberate security boundary.
+- Do not merge the POC branches or change production defaults without explicit approval.
 
 ## Next operational task: Tapo backup/retention audit
 
