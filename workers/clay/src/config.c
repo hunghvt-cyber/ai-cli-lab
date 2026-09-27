@@ -255,6 +255,10 @@ static int set_bool_field(const char *key, int value) {
 }
 
 char *clay_config_sandbox_mode(void) {
+  const char *env_mode = getenv("CLAY_SANDBOX_MODE");
+  if (env_mode && *env_mode)
+    return strdup(env_mode);
+
   ClayJson *root = load_selection_root();
   char *mode = string_field(root, "sandbox_mode", "sandbox");
   clay_json_free(root);
