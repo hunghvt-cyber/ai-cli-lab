@@ -71,7 +71,7 @@ echo
 set +e
 case "$PROVIDER" in
   gemini)
-    "$GUARD/adapters/clay" --provider gemini --gemini-key "$KEY" --worker "$WORKER" --workspace "$WORKSPACE" --network host --ssh-key /home/clay/.ssh/id_ed25519 -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
+    "$GUARD/adapters/clay" --provider gemini --gemini-key "$KEY" --worker "$WORKER" --workspace "$WORKSPACE" --network host --ssh-key /home/clay/.ssh/id_ed25519 --clay-sandbox-mode unleashed-auto -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
     ;;
   groq)
     "$GUARD/adapters/clay" --provider groq --worker "$WORKER" --workspace "$WORKSPACE" --network host --ssh-key /home/clay/.ssh/id_ed25519 -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
