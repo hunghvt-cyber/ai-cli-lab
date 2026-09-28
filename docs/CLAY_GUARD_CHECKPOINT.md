@@ -390,3 +390,68 @@ Important implementation facts:
 - The current FnNAS Tapo checkout was verified on 2026-09-28: SSH Git fetch from `github.com` succeeds and updates `origin/main`.
 - Clay's host SSH capability is already verified separately; this workflow combines that capability with the host's existing GitHub SSH authentication.
 - GitHub remains the source of truth. Clay only consumes task instructions and reports execution output; it does not publish to GitHub.
+
+
+## Dedicated Clay SSH — FnNAS host proof
+
+**Verified: 2026-09-28**
+
+The dedicated Clay SSH path is now proven end-to-end against the real FnNAS Tailscale address.
+
+Runtime command path:
+
+```
+Clay worker
+  ↓
+AI Guard adapter
+  ↓
+--ssh-key /home/clay/.ssh/id_ed25519
+  ↓
+/run/secrets/CLAY_SSH_KEY
+  ↓
+CLAY_SSH_KEY_PATH=/run/secrets/CLAY_SSH_KEY
+  ↓
+Clay `unleashed-auto` shell execution
+  ↓
+ssh -i "$CLAY_SSH_KEY_PATH"
+  ↓
+clay@100.94.158.94
+```
+
+Observed proof:
+
+```
+✓ Executed
+  · $ ssh ...
+  · CLAY_ADMIN_HOST_OK
+
+CLAY_ADMIN_HOST_OK
+```
+
+This proves that the SSH command is actually executed by Clay, the dedicated key is injected through AI Guard, the shell can access the injected key path, host networking is usable for the SSH connection, and the FnNAS `clay` account accepts the dedicated key.
+
+A direct test of the same dedicated key against `admin@100.94.158.94` returned:
+
+```
+Permission denied (publickey,password)
+```
+
+This is expected from the current authorization model: the dedicated Clay key is authorized for `clay`, not `admin`. Do not copy the Clay private key into the admin account merely to satisfy the old task target.
+
+The operational Tapo task target is therefore:
+
+```
+TARGET_HOST: clay@100.94.158.94
+```
+
+The `clay` account's existing sudo policy remains the privilege boundary for explicitly authorized host operations.
+
+### SSH safety facts
+
+- Dedicated private key remains outside GitHub, workspace, and argv.
+- AI Guard injects it as a read-only secret file.
+- `--ssh-key` requires `--network host`.
+- Clay's internal sandbox is disabled only for deliberate `unleashed-auto` runs; AI Guard remains the outer enforcement boundary.
+- Docker socket remains unexposed.
+- GitHub write/publishing remains unavailable to Clay.
+- Do not use the old Gemini SSH identity for Clay.
