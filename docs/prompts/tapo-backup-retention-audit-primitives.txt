@@ -6,11 +6,24 @@ STRICT SAFETY:
 - Never expose API keys, credentials, tokens, private keys, passwords, usernames, cookies, or secret values.
 - NEVER read, cat, grep, stat, or otherwise inspect any `.secrets/` directory, `.env` file, credential file, password file, API-key file, SSH private key, rclone credential/config file, or provider secret path.
 - Treat filenames containing `secret`, `credential`, `password`, `token`, `api-key`, `apikey`, `rclone.conf`, `.env`, or similar as sensitive and do not open them. You may report that such a file exists without reading its contents.
-- If a command output contains a secret accidentally, stop immediately and do not repeat, quote, summarize, or continue inspecting that source.
+- If a command output contains a secret accidentally, stop immediately. Do not repeat, quote, summarize, transform, or continue inspecting that source. Return only a generic safety-stop indication.
+- Never print, echo, quote, or include the contents of environment variables that may contain secrets.
+- Never print SSH command lines containing private-key paths, secret paths, or credential-bearing arguments.
 - Do not implement recommendations.
-- If a host-level fact is not visible from /workspace, report NOT OBSERVABLE. Do not infer it as fact.
+- Host-level facts MUST be collected from the real FnNAS host through the injected dedicated Clay SSH capability:
+  TARGET_HOST=clay@100.94.158.94
+  SSH_KEY_PATH is provided by AI Guard as /run/secrets/CLAY_SSH_KEY via CLAY_SSH_KEY_PATH.
+- Do not use /workspace as the source of truth for host state. Use /workspace only for repository/task source inspection.
 - Do not use recursive ls.
 - Use exactly ONE shell command per tool call.
+
+HOST ACCESS:
+- For host-level audit facts, SSH to TARGET_HOST using the dedicated Clay key exposed through CLAY_SSH_KEY_PATH.
+- Do not SSH as admin.
+- Do not install or copy the Clay key anywhere.
+- Host commands must remain read-only.
+- If SSH is unavailable, report host-level items as NOT OBSERVABLE rather than substituting workspace evidence.
+- Never read any secret file on the host, including SSH private keys, rclone config, .env, .secrets, credential, token, password, or API-key files.
 
 TOOL-USE DISCIPLINE:
 Treat shell access as these virtual primitives:
@@ -25,15 +38,23 @@ Treat shell access as these virtual primitives:
    - Use stat only.
 5. run_readonly(command)
    - Exactly one safe read-only command.
-   - No command chaining.
-   - No &&, ;, pipes, command substitution, or multiple commands in one tool call.
+   - No command chaining, pipes, command substitution, redirection, backgrounding, or multiple commands in one tool call.
+   - For host access, one primitive may be a single ssh invocation whose remote command is exactly one read-only command.
    - Never invent malformed commands such as ls -R1 or ls -1.
    - If a command fails, adapt using a simpler valid command; do not retry by concatenating alternatives.
+
+OUTPUT SAFETY:
+- The final report must contain only non-secret outputs.
+- Do not reproduce raw command output wholesale when it may contain sensitive material.
+- Summarize counts, paths, timestamps, service states, filenames, sizes, and non-secret configuration facts only.
+- For any suspicious output, omit the value and report "[REDACTED]" or "NOT OBSERVABLE".
+- Never include API keys, tokens, passwords, cookies, private keys, SSH key material, or secret environment values in the report.
+- Never include the contents of sensitive files even if a command accidentally returned them.
 
 AUDIT:
 1. Actual backup/upload/archive/manifest/reconciliation/retention scripts and configs.
 2. Actual recording paths and filename/date structure.
-3. Cron jobs, systemd services/timers, and recent execution evidence, but only if observable.
+3. Cron jobs, systemd services/timers, and recent execution evidence on the real host.
 4. Rclone commands/configuration without secrets.
 5. Google Drive remote path mapping.
 6. Already-uploaded detection.
