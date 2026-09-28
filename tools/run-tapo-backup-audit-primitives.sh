@@ -68,9 +68,9 @@ echo
 
 set +e
 if [ "$PROVIDER" = "gemini" ]; then
-  "$GUARD/adapters/clay" --provider gemini --gemini-key "$KEY" --worker "$WORKER" --workspace "$WORKSPACE" --network host -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
+  "$GUARD/adapters/clay" --provider gemini --gemini-key "$KEY" --worker "$WORKER" --workspace "$WORKSPACE" --network host --ssh-key /home/clay/.ssh/id_ed25519 -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
 else
-  "$GUARD/adapters/clay" --provider groq --worker "$WORKER" --workspace "$WORKSPACE" --network host -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
+  "$GUARD/adapters/clay" --provider groq --worker "$WORKER" --workspace "$WORKSPACE" --network host --ssh-key /home/clay/.ssh/id_ed25519 -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
 fi
 clay_status=$?
 set -e
