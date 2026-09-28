@@ -301,3 +301,24 @@ Do not weaken the Guard filesystem boundary merely to obtain host-only facts. If
 - `tapo-nas-lab`: Tapo/NAS application.
 
 The Clay worker belongs to `ai-cli-lab`; the security boundary belongs to `Ai-guard`.
+
+
+### Tapo audit runner hardening — 2026-09-28
+
+The Tapo audit runner and prompt were hardened after a full-audit failure mode:
+
+- The prompt now defines a fixed, explicit list of workspace and real-host read-only commands.
+- Host commands must use the dedicated SSH identity via `CLAY_SSH_KEY_PATH` and `clay@100.94.158.94`.
+- One shell/tool call at a time; one remote read-only command per SSH call.
+- Clay is explicitly forbidden from using file-write/edit tools or creating an audit report file.
+- The audit report must be returned only on stdout.
+- The runner snapshots `git status --short` before and after the worker. Any workspace-state change is a hard safety stop.
+- Provider selector accepts 1..3 consistently.
+- The runner still withholds raw output until its credential scan passes.
+- Clay must report host facts as `NOT OBSERVABLE` if SSH fails; workspace documents cannot substitute for host evidence.
+
+Current commits on `feat/clay-guard-unleashed`:
+- prompt: `a4be59cca09804288ee4c7daebe0c5fb392707cd`
+- runner: `7c3e1a6e96021914650001901da3308e2748ef3b`
+
+The runner remains non-publishing: it does not commit or push audit results to GitHub.
