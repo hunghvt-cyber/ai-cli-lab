@@ -14,12 +14,12 @@ if [ "$#" -eq 0 ]; then
   echo "1. Gemini"
   echo "2. Groq"
   echo "3. OpenRouter"
-  read -r -p "Select provider [1-2]: " provider_choice
+  read -r -p "Select provider [1-3]: " provider_choice
   case "$provider_choice" in
     1) PROVIDER="gemini" ;;
     2) PROVIDER="groq" ;;
     3) PROVIDER="openrouter" ;;
-    *) echo "ERROR: provider must be 1 or 2" >&2; exit 1 ;;
+    *) echo "ERROR: provider must be 1..3" >&2; exit 1 ;;
   esac
 elif [[ "${1:-}" =~ ^[1-5]$ ]]; then
   PROVIDER="gemini"
@@ -68,6 +68,10 @@ echo "Primitive shell discipline: ENABLED"
 echo "Output is withheld until secret scan passes."
 echo
 
+# Snapshot workspace status. The audit is strictly read-only; a newly created/deleted
+# workspace file is a hard failure. Runtime event JSONL may legitimately remain modified.
+before_status="$(git status --short)"
+
 set +e
 case "$PROVIDER" in
   gemini)
@@ -89,6 +93,18 @@ if grep -Eiq '(GROQ_API_KEY|GEMINI_API_KEY|OPENROUTER_API_KEY|CLAY_API_KEY|TAPO_
   echo "Audit exit status: $clay_status" >&2
   echo "Log directory: $log_dir" >&2
   exit 3
+fi
+
+after_status="$(git status --short)"
+if [ "$after_status" != "$before_status" ]; then
+  echo "SAFETY STOP: audit changed workspace state; output withheld." >&2
+  echo "Audit exit status: $clay_status" >&2
+  echo "Log directory: $log_dir" >&2
+  echo "--- STATUS BEFORE ---" >&2
+  printf "%s\\n" "$before_status" >&2
+  echo "--- STATUS AFTER ---" >&2
+  printf "%s\\n" "$after_status" >&2
+  exit 4
 fi
 
 if [ "$clay_status" -ne 0 ]; then
