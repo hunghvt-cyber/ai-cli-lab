@@ -13,20 +13,22 @@ if [ "$#" -eq 0 ]; then
   echo "=== AI Provider Selector ==="
   echo "1. Gemini"
   echo "2. Groq"
+  echo "3. OpenRouter"
   read -r -p "Select provider [1-2]: " provider_choice
   case "$provider_choice" in
     1) PROVIDER="gemini" ;;
     2) PROVIDER="groq" ;;
+    3) PROVIDER="openrouter" ;;
     *) echo "ERROR: provider must be 1 or 2" >&2; exit 1 ;;
   esac
 elif [[ "${1:-}" =~ ^[1-5]$ ]]; then
   PROVIDER="gemini"
   KEY="$1"
-elif [ "$1" = "gemini" ] || [ "$1" = "groq" ]; then
+elif [ "$1" = "gemini" ] || [ "$1" = "groq" ] || [ "$1" = "openrouter" ]; then
   PROVIDER="$1"
   KEY="${2:-}"
 else
-  echo "ERROR: usage: $0 [gemini [1-5]|groq|1-5]" >&2
+  echo "ERROR: usage: $0 [gemini [1-5]|groq|openrouter|1-5]" >&2
   exit 1
 fi
 
@@ -67,11 +69,18 @@ echo "Output is withheld until secret scan passes."
 echo
 
 set +e
-if [ "$PROVIDER" = "gemini" ]; then
-  "$GUARD/adapters/clay" --provider gemini --gemini-key "$KEY" --worker "$WORKER" --workspace "$WORKSPACE" --network host --ssh-key /home/clay/.ssh/id_ed25519 -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
-else
-  "$GUARD/adapters/clay" --provider groq --worker "$WORKER" --workspace "$WORKSPACE" --network host --ssh-key /home/clay/.ssh/id_ed25519 -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
-fi
+case "$PROVIDER" in
+  gemini)
+    "$GUARD/adapters/clay" --provider gemini --gemini-key "$KEY" --worker "$WORKER" --workspace "$WORKSPACE" --network host --ssh-key /home/clay/.ssh/id_ed25519 -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
+    ;;
+  groq)
+    "$GUARD/adapters/clay" --provider groq --worker "$WORKER" --workspace "$WORKSPACE" --network host --ssh-key /home/clay/.ssh/id_ed25519 -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
+    ;;
+  openrouter)
+    CLAY_OPENROUTER_SECRET_ENV=/vol1/Docker/ai-cli-lab/secrets/openrouter.env \
+      "$GUARD/adapters/clay" --provider openrouter --worker "$WORKER" --workspace "$WORKSPACE" --network host --ssh-key /home/clay/.ssh/id_ed25519 -- --cwd /workspace --prompt "$(cat "$PROMPT")" >"$raw_log" 2>&1
+    ;;
+esac
 clay_status=$?
 set -e
 
