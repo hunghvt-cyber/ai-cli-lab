@@ -83,3 +83,6 @@ H. EVIDENCE - exact paths, commands and non-secret outputs
 I. SMALLEST SAFE IMPLEMENTATION PLAN
 
 Do not implement section I. Stop after the report.
+
+PROVIDER NOTE
+The hardened runner may invoke Gemini, Groq, or OpenRouter. Provider choice does not change the read-only, secret-safety, real-FnNAS SSH, or no-GitHub-write rules above. OpenRouter credentials are injected through AI Guard and must never be read, printed, quoted, summarized, or included in command output.
