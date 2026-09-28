@@ -86,3 +86,8 @@ Do not implement section I. Stop after the report.
 
 PROVIDER NOTE
 The hardened runner may invoke Gemini, Groq, or OpenRouter. Provider choice does not change the read-only, secret-safety, real-FnNAS SSH, or no-GitHub-write rules above. OpenRouter credentials are injected through AI Guard and must never be read, printed, quoted, summarized, or included in command output.
+
+HOST-EVIDENCE FAIL-CLOSED RULES
+- AUDIT_REPORT.md, current.md, README files, prior audit reports, historical notes, or any other workspace/document artifact are NOT evidence of current FnNAS host state. Never use them to fill, infer, or substitute for a host fact.
+- If any SSH attempt needed for host collection fails, do not fall back to workspace artifacts. Mark the affected host facts NOT OBSERVABLE and continue only with host-independent facts that can be verified safely.
+- A successful Clay/Guard process exit does not mean host audit succeeded. Host evidence requires successful SSH execution and non-secret remote output.
