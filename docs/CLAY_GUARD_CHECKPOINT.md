@@ -355,3 +355,38 @@ Do not weaken the Guard filesystem boundary merely to obtain host-only facts. If
 - `tapo-nas-lab`: Tapo/NAS application.
 
 The Clay worker belongs to `ai-cli-lab`; the security boundary belongs to `Ai-guard`.
+
+
+## GitHub task → FnNAS → Clay execution workflow
+
+The operational task handoff uses GitHub as the durable source of truth without giving Clay GitHub write access or GitHub credentials.
+
+For a private project repository, Clay must not fetch `raw.githubusercontent.com` directly because unauthenticated raw access returns 404. The FnNAS host already has authenticated Git SSH access to the Tapo repository.
+
+The preferred read-only flow is:
+
+```
+ChatGPT
+  ↓
+GitHub main / tasks/current.md
+  ↓
+FnNAS: git fetch origin main
+  ↓
+git show origin/main:tasks/current.md
+  ↓
+Clay reads the task
+  ↓
+Clay SSH / executes the explicitly listed host commands
+  ↓
+Clay returns aggregate output to ChatGPT
+```
+
+Important implementation facts:
+
+- Do not use `gh` merely for task retrieval.
+- Do not give Clay a GitHub token or GitHub write capability.
+- Do not `git pull` the Tapo working tree merely to obtain a task; the host may be checked out on another branch.
+- Prefer `git fetch origin main` followed by `git show origin/main:tasks/current.md`, which updates remote-tracking metadata without changing the working tree.
+- The current FnNAS Tapo checkout was verified on 2026-09-28: SSH Git fetch from `github.com` succeeds and updates `origin/main`.
+- Clay's host SSH capability is already verified separately; this workflow combines that capability with the host's existing GitHub SSH authentication.
+- GitHub remains the source of truth. Clay only consumes task instructions and reports execution output; it does not publish to GitHub.
